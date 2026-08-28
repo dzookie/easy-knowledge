@@ -1,0 +1,42 @@
+# ============ 通用 ============
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.local
+.env.*.local
+.vscode/
+.idea/
+
+# ============ 依赖 ============
+node_modules/
+.pnp
+.pnp.js
+
+# ============ 构建产物 ============
+dist/
+dist-ssr/
+*.local
+generated/
+
+# ============ 测试 / 缓存 ============
+coverage/
+.nyc_output/
+.cache/
+.eslintcache
+
+# ============ Prisma ============
+# 保留 schema 和 migrations, 但忽略生成的 client
+server/node_modules/.prisma/
+server/generated/
+
+# ============ 运行时数据 ============
+*.sqlite
+*.sqlite-journal
+uploads/
+data/
+
+# ============ 秘钥 / 配置 ============
+*.pem
+*.key
+config/local.*

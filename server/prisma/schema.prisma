@@ -1,0 +1,46 @@
+// ============ Prisma Schema ============
+// Easy-Knowledge 数据库模型
+// 文档参考: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ 枚举 ============
+
+/// 用户角色
+/// - ADMIN: 管理员(全权限)
+/// - USER: 知识库用户(创建/管理自有知识库、上传文档、配置切片、调用问答 API)
+enum Role {
+  ADMIN
+  USER
+}
+
+// ============ 模型 ============
+
+/// 用户表
+model User {
+  id           BigInt    @id @default(autoincrement())
+  username     String    @unique @db.VarChar(32)
+  passwordHash String    @map("password_hash") @db.VarChar(100)
+  nickname     String?   @db.VarChar(32)
+  email        String?   @unique @db.VarChar(128)
+  phone        String?   @db.VarChar(20)
+  avatar       String?   @db.VarChar(255)
+  role         Role      @default(USER)
+  status       Int       @default(1) @db.TinyInt
+  lastLoginAt  DateTime? @map("last_login_at")
+  lastLoginIp  String?   @map("last_login_ip") @db.VarChar(45)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  @@index([role])
+  @@index([status])
+  @@map("user")
+}
