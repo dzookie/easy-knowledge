@@ -1,0 +1,21 @@
+@import './base.css';
+
+/* 后台布局: 取消脚手架原本的 max-width 限制, 让 #app 占满视口 */
+#app {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  font-weight: normal;
+}
+
+/* 保留向后兼容的链接 hover */
+a {
+  transition: color 0.16s ease;
+}
+
+@media (hover: hover) {
+  a:hover {
+    opacity: 0.85;
+  }
+}

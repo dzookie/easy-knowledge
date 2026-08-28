@@ -1,0 +1,15 @@
+/**
+ * 样式入口:引入顺序必须保持如下
+ *  1) theme.css               —  Claude Design Token (亮/暗模式)
+ *  2) element-plus/dist/index.css  —  Element Plus 默认主题
+ *  3) element-plus-overrides.css    —  用 Claude Token 覆盖 EP 默认主题
+ *  4) assets/main.css         —  Vite 脚手架原始样式(保留以保证向后兼容)
+ *
+ * 注意: 这里必须用 CSS 原生的 @import 语法 (而非 JS import),
+ *       否则 Vite 会把每行 import 当作无效 CSS 忽略。
+ *       同时 @import 必须位于所有其他规则之前 (CSS 规范要求)。
+ */
+@import './theme.css';
+@import 'element-plus/dist/index.css';
+@import './element-plus-overrides.css';
+@import '@/assets/main.css';

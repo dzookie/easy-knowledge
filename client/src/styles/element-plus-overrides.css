@@ -1,0 +1,239 @@
+/* =============================================================
+   element-plus-overrides.css
+   把 Element Plus 默认主题变量对齐到 Claude Design System
+   顺序: 1) 亮模式覆盖  2) 暗模式覆盖
+   ============================================================= */
+
+/* ---------- 亮模式 ---------- */
+:root {
+  /* 主色:品牌赤陶色 */
+  --el-color-primary:            var(--brand-500);
+  --el-color-primary-light-3:    var(--brand-300);
+  --el-color-primary-light-5:    var(--brand-200);
+  --el-color-primary-light-7:    var(--brand-100);
+  --el-color-primary-light-8:    var(--brand-50);
+  --el-color-primary-light-9:    var(--brand-50);
+  --el-color-primary-dark-2:     var(--brand-700);
+
+  /* 成功/危险/警告/信息 采用暖色低饱和 */
+  --el-color-success:            var(--success-500);
+  --el-color-success-light-3:    var(--success-300);
+  --el-color-success-light-5:    var(--success-200);
+  --el-color-success-light-7:    var(--success-100);
+  --el-color-success-light-8:    var(--success-50);
+  --el-color-success-light-9:    var(--success-50);
+  --el-color-success-dark-2:     var(--success-700);
+
+  --el-color-warning:            var(--brand-500); /* 复用赤陶色做 warning */
+  --el-color-warning-light-3:    var(--brand-300);
+  --el-color-warning-light-5:    var(--brand-200);
+  --el-color-warning-light-7:    var(--brand-100);
+  --el-color-warning-light-8:    var(--brand-50);
+  --el-color-warning-light-9:    var(--brand-50);
+  --el-color-warning-dark-2:     var(--brand-700);
+
+  --el-color-danger:             var(--error-500);
+  --el-color-danger-light-3:     var(--error-300);
+  --el-color-danger-light-5:     var(--error-200);
+  --el-color-danger-light-7:     var(--error-100);
+  --el-color-danger-light-8:     var(--error-50);
+  --el-color-danger-light-9:     var(--error-50);
+  --el-color-danger-dark-2:      var(--error-700);
+
+  --el-color-info:               var(--text-500);
+
+  /* 中性色 · 文字层级 */
+  --el-text-color-primary:       var(--foreground);
+  --el-text-color-regular:       var(--text-700);
+  --el-text-color-secondary:     var(--muted-foreground);
+  --el-text-color-placeholder:   var(--text-400);
+  --el-text-color-disabled:      var(--text-400);
+
+  /* 中性色 · 边框/分隔线 */
+  --el-border-color:             var(--border);
+  --el-border-color-light:       var(--border-200);
+  --el-border-color-lighter:     var(--border-100);
+  --el-border-color-extra-light: var(--border-50);
+  --el-border-color-dark:        var(--border-500);
+  --el-border-width:             1px;
+  --el-border-radius-base:       var(--radius);
+  --el-border-radius-small:      var(--radius-sm);
+  --el-border-radius-round:      var(--radius-full);
+
+  /* 中性色 · 背景层级 */
+  --el-bg-color:                 var(--background);
+  --el-bg-color-page:            var(--bg-100);
+  --el-bg-color-overlay:         var(--popover);
+  --el-fill-color:               var(--card);
+  --el-fill-color-light:         var(--bg-200);
+  --el-fill-color-lighter:       var(--bg-100);
+  --el-fill-color-extra-light:   var(--bg-50);
+  --el-fill-color-blank:         var(--bg-50);
+  --el-mask-color:               rgba(0, 0, 0, 0.4);
+
+  /* 字号 */
+  --el-font-size-extra-large: 20px;
+  --el-font-size-large:       16px;
+  --el-font-size-medium:      14px;
+  --el-font-size-base:        14px;
+  --el-font-size-small:       13px;
+  --el-font-size-extra-small: 12px;
+  --el-font-family:           var(--font-sans);
+
+  /* 尺寸 */
+  --el-component-size:         44px; /* 默认按钮/输入高度对齐 8.4.7 统一 44 */
+  --el-component-size-large:   52px;
+  --el-component-size-small:   36px;
+
+  /* 字体字重 */
+  --el-font-weight-primary:    600;
+
+  /* 阴影(纸张抬升感,非发光) */
+  --el-box-shadow:             var(--shadow-sm);
+  --el-box-shadow-light:       var(--shadow-xs);
+  --el-box-shadow-lighter:     var(--shadow-2xs);
+  --el-box-shadow-dark:        var(--shadow-md);
+  --el-popup-modal-box-shadow: var(--shadow-lg);
+  --el-dropdown-menu-box-shadow: var(--shadow-md);
+  --el-dialog-box-shadow:      var(--shadow-xl);
+  --el-card-box-shadow:        var(--shadow-sm);
+
+  /* transition 统一 160ms ease */
+  --el-transition-duration:    .16s;
+}
+
+/* 暗模式(通过 html.dark 触发) */
+html.dark {
+  color-scheme: dark;
+  --el-color-primary:          var(--brand-500);
+  --el-color-primary-light-3:  var(--brand-300);
+  --el-color-primary-light-5:  var(--brand-400);
+  --el-color-primary-light-7:  var(--brand-200);
+  --el-color-primary-light-8:  var(--brand-200);
+  --el-color-primary-light-9:  var(--brand-100);
+  --el-color-primary-dark-2:   var(--brand-700);
+
+  --el-color-success:          var(--success-500);
+  --el-color-danger:           var(--error-500);
+  --el-color-warning:          var(--brand-500);
+  --el-color-info:             var(--text-500);
+
+  --el-text-color-primary:     var(--foreground);
+  --el-text-color-regular:     var(--text-700);
+  --el-text-color-secondary:   var(--muted-foreground);
+  --el-text-color-placeholder: var(--text-400);
+  --el-text-color-disabled:    var(--text-400);
+
+  --el-border-color:           var(--border);
+  --el-border-color-light:     var(--border-200);
+  --el-border-color-lighter:   var(--border-100);
+  --el-border-color-extra-light: var(--border-50);
+  --el-border-color-dark:      var(--border-500);
+
+  --el-bg-color:               var(--background);
+  --el-bg-color-page:          var(--bg-100);
+  --el-bg-color-overlay:       var(--popover);
+  --el-fill-color:             var(--card);
+  --el-fill-color-light:       var(--bg-200);
+  --el-fill-color-lighter:     var(--bg-100);
+  --el-fill-color-extra-light: var(--bg-50);
+  --el-fill-color-blank:       var(--bg-50);
+  --el-mask-color:             rgba(0, 0, 0, 0.55);
+
+  --el-box-shadow:             var(--shadow-sm);
+  --el-box-shadow-light:       var(--shadow-xs);
+  --el-box-shadow-lighter:     var(--shadow-2xs);
+  --el-box-shadow-dark:        var(--shadow-md);
+}
+
+/* ---------- 组件级样式精修 ---------- */
+
+/* ElButton 高度统一 44/36/52,圆角 16px */
+.el-button { font-weight: 600; border-radius: var(--radius) !important; }
+.el-button--small { padding: 9px 14px; }
+.el-button--default { padding: 12px 18px; }
+.el-button--large { padding: 15px 24px; }
+.el-button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.el-button.is-text { padding: 6px 8px; }
+
+/* ElInput 高度 + 圆角 + 阴影 */
+.el-input__wrapper,
+.el-textarea__inner {
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-sm);
+}
+.el-textarea__inner { padding: 10px 14px; }
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--ring) inset, var(--shadow-sm) !important;
+}
+
+/* ElCard: 去掉默认大边框,用纸张感阴影 */
+.el-card { border-radius: var(--radius) !important; border: 1px solid var(--border); }
+.el-card__body { padding: 24px; }
+.el-card__header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-100);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+}
+
+/* ElMessage:ElNotification/ElMessageBox 圆角加大,暖色阴影 */
+.el-message,
+.el-notification,
+.el-message-box { border-radius: var(--radius) !important; }
+
+/* ElTable: 去掉多余分隔线, 用浅米色 header */
+.el-table { --el-table-border-color: var(--border-100); }
+.el-table th.el-table__cell {
+  background: var(--card) !important;
+  color: var(--text-700);
+  font-weight: 600;
+}
+.el-table tr:hover > td { background: var(--bg-200) !important; }
+
+/* ElDialog */
+.el-dialog { border-radius: var(--radius-xl) !important; box-shadow: var(--shadow-xl); }
+.el-dialog__title { font-family: var(--font-display); font-weight: 600; font-size: 20px; }
+.el-dialog__header { padding: 24px 24px 12px; }
+.el-dialog__body { padding: 12px 24px 24px; }
+
+/* ElDrawer */
+.el-drawer { background: var(--popover); }
+
+/* ElTag -> 对齐 Badge 风格 */
+.el-tag { border-radius: var(--radius); font-weight: 600; padding: 0 14px; height: 32px; line-height: 30px; }
+
+/* ElMenu (sidebar) 克制 active 色 */
+.el-menu { border-right: none; background: transparent; }
+.el-menu-item,
+.el-sub-menu__title {
+  border-radius: 8px; /* radius - 8 */
+  margin: 2px 6px;
+  font-weight: 600;
+  color: var(--sidebar-foreground);
+}
+.el-menu-item:hover,
+.el-sub-menu__title:hover { background: var(--sidebar-accent) !important; color: var(--foreground) !important; }
+.el-menu-item.is-active {
+  background: var(--popover) !important;
+  color: var(--foreground) !important;
+  box-shadow: var(--shadow-xs);
+}
+
+/* ElPagination 克制 */
+.el-pagination button,
+.el-pager li { border-radius: var(--radius-sm) !important; }
+
+/* ElForm label 字重 + 颜色 */
+.el-form-item__label { font-weight: 600; color: var(--text-700); }
+
+/* ElUpload 圆角 */
+.el-upload-dragger { border-radius: var(--radius-xl) !important; border-style: dashed; }
+
+/* ElBadge 无发光 */
+.el-badge__content { box-shadow: none; }
+
+/* ElDescriptions 信息列表 */
+.el-descriptions-item__label { font-weight: 600; color: var(--muted-foreground); }
