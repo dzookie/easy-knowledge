@@ -71,20 +71,39 @@ const router = createRouter({
 
 /**
  * 路由守卫
- * - requiresAuth 路由: 未登录跳转 /login
- * - public 路由(如 /login): 已登录则跳转 /admin(避免重复登录)
+ * - public 路由(如 /login): 已登录则跳转 /admin, 避免重复登录
+ * - requiresAuth 路由:
+ *   1) 无 token → 跳 /login?redirect=xxx
+ *   2) 有 token 但尚未加载用户信息 → 调 fetchCurrentUserDetail() 刷新
+ *      (保证管理员禁用/改角色等变更能立即生效)
+ *   3) fetchCurrentUserDetail 失败(401/网络) → 跳 /login
  */
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
   const requiresAuth = to.matched.some((r) => r.meta.requiresAuth)
   const isPublic = to.matched.some((r) => r.meta.public)
 
-  if (requiresAuth && !auth.isLoggedIn) {
-    return { path: '/login', query: { redirect: to.fullPath } }
-  }
-
+  // 已登录访问公开页(如登录页) → 跳后台
   if (isPublic && auth.isLoggedIn) {
     return { path: '/admin' }
+  }
+
+  // 需要鉴权的页面
+  if (requiresAuth) {
+    if (!auth.isLoggedIn) {
+      return { path: '/login', query: { redirect: to.fullPath } }
+    }
+
+    // 有 token 但用户信息未加载 → 拉一次最新信息
+    // (登录后首次跳转 / 刷新页面后 userLoaded 会被重置为 false)
+    if (!auth.userLoaded) {
+      try {
+        await auth.fetchCurrentUserDetail()
+      } catch {
+        // 拉取失败(401 已被 http 拦截器 logout, 这里兜底跳登录)
+        return { path: '/login', query: { redirect: to.fullPath } }
+      }
+    }
   }
 
   if (to.meta.title) {

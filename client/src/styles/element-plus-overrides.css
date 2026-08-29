@@ -237,3 +237,27 @@ html.dark {
 
 /* ElDescriptions 信息列表 */
 .el-descriptions-item__label { font-weight: 600; color: var(--muted-foreground); }
+
+/* =============================================================
+   自动填充背景色覆盖
+   浏览器自动填充账号密码会注入淡蓝色背景, 这里强制透明并沿用输入框前景色
+   -webkit-box-shadow 用于模拟背景色, 与卡片色保持一致
+   transition-delay 用于关闭 Chrome 切换时的过渡闪烁
+   ============================================================= */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--foreground) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--el-input-bg-color, var(--card)) inset !important;
+  caret-color: var(--foreground);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* 暗模式: 背景色用 input 实际背景 */
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover,
+html.dark input:-webkit-autofill:focus,
+html.dark input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--el-input-bg-color, var(--input)) inset !important;
+}

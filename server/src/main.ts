@@ -1,8 +1,11 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -28,6 +31,16 @@ async function bootstrap() {
       forbidNonWhitelisted: false, // 不抛错, 仅剥离
     }),
   );
+
+  // ===== 全局响应拦截器(自动包装 { code, message, data }) =====
+  app.useGlobalInterceptors(new TransformInterceptor());
+
+  // ===== 全局异常过滤器(统一错误响应格式) =====
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  // ===== 全局 JWT 鉴权守卫(默认所有接口需登录, @Public() 跳过) =====
+  const reflector = app.get(Reflector);
+  app.useGlobalGuards(new JwtAuthGuard(reflector));
 
   // ===== Swagger 文档 =====
   const swaggerConfig = new DocumentBuilder()

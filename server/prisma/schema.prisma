@@ -11,16 +11,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============ 枚举 ============
-
-/// 用户角色
-/// - ADMIN: 管理员(全权限)
-/// - USER: 知识库用户(创建/管理自有知识库、上传文档、配置切片、调用问答 API)
-enum Role {
-  ADMIN
-  USER
-}
-
 // ============ 模型 ============
 
 /// 用户表
@@ -32,7 +22,8 @@ model User {
   email        String?   @unique @db.VarChar(128)
   phone        String?   @db.VarChar(20)
   avatar       String?   @db.VarChar(255)
-  role         Role      @default(USER)
+  roleId       BigInt    @map("role_id")
+  role         Role      @relation(fields: [roleId], references: [id])
   status       Int       @default(1) @db.TinyInt
   lastLoginAt  DateTime? @map("last_login_at")
   lastLoginIp  String?   @map("last_login_ip") @db.VarChar(45)
@@ -40,7 +31,65 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
 
-  @@index([role])
+  @@index([roleId])
   @@index([status])
   @@map("user")
+}
+
+/// 角色表
+/// 对应数据库 schema.sql 中的 role 表
+/// code: admin(管理员) / user(知识库用户)
+model Role {
+  id          BigInt    @id @default(autoincrement())
+  code        String    @unique @db.VarChar(32)
+  name        String    @db.VarChar(64)
+  description String?   @db.VarChar(255)
+  sort        Int       @default(0)
+  status      Int       @default(1) @db.TinyInt
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  users       User[]
+  menus       RoleMenu[]
+
+  @@map("role")
+}
+
+/// 菜单与权限表(树形结构, parent_id=0 为根)
+/// type: 1目录 2菜单 3按钮
+model Menu {
+  id          BigInt    @id @default(autoincrement())
+  parentId    BigInt    @default(0) @map("parent_id")
+  name        String    @db.VarChar(64)
+  type        Int       @default(2) @db.TinyInt
+  path        String?   @db.VarChar(128)
+  component   String?   @db.VarChar(128)
+  icon        String?   @db.VarChar(64)
+  permission  String?   @db.VarChar(128)
+  sort        Int       @default(0)
+  visible     Int       @default(1) @db.TinyInt
+  status      Int       @default(1) @db.TinyInt
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  roles       RoleMenu[]
+
+  @@index([parentId])
+  @@map("menu")
+}
+
+/// 角色-菜单关联表
+model RoleMenu {
+  roleId    BigInt @map("role_id")
+  menuId    BigInt @map("menu_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  role      Role    @relation(fields: [roleId], references: [id])
+  menu      Menu    @relation(fields: [menuId], references: [id])
+
+  @@id([roleId, menuId])
+  @@index([menuId])
+  @@map("role_menu")
 }

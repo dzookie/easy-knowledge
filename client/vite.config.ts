@@ -16,10 +16,11 @@ export default defineConfig({
     },
   },
   server: {
+    port: 3031,
     proxy: {
-      // 后端 API 代理: /api/* -> http://localhost:3000/api/*
+      // 后端 API 代理: /api/* -> http://localhost:3030/api/*
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3030',
         changeOrigin: true,
       },
     },

@@ -1,20 +1,22 @@
 /**
  * HTTP 客户端 — 基于 fetch 的轻量封装
  * - 自动携带 Authorization Bearer token
- * - 统一错误处理
- * - 自动 JSON 解析
+ * - 适配后端统一响应格式 { code, message, data }
+ * - 401 自动登出
  */
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
 
+/** 后端统一响应结构 */
 export interface ApiResponse<T = unknown> {
-  data: T
-  message?: string
+  code: number        // 200=成功, 其他=错误
+  message: string
+  data: T | null
 }
 
 export class HttpError extends Error {
   constructor(
-    public status: number,
+    public code: number,
     message: string,
   ) {
     super(message)
@@ -38,36 +40,39 @@ async function request<T = unknown>(
 
   const response = await fetch(url, { ...options, headers })
 
+  // 解析响应体(后端始终返回 { code, message, data })
+  let body: ApiResponse<T>
+  try {
+    body = await response.json() as ApiResponse<T>
+  } catch {
+    throw new HttpError(500, '响应解析失败')
+  }
+
   // 401: token 失效, 清除登录态
-  if (response.status === 401) {
+  if (body.code === 401 || response.status === 401) {
     auth.logout(true)
-    ElMessage.error('登录已过期,请重新登录')
-    throw new HttpError(401, '登录已过期')
+    ElMessage.error(body.message || '登录已过期,请重新登录')
+    throw new HttpError(401, body.message || '登录已过期')
   }
 
-  // 非 2xx: 尝试解析错误消息
-  if (!response.ok) {
-    let message = `请求失败 (${response.status})`
-    try {
-      const errorBody = await response.json()
-      message = errorBody.message || message
-    } catch {
-      // 非 JSON 错误体
-    }
-    throw new HttpError(response.status, message)
+  // 非 200: 业务错误
+  if (body.code !== 200) {
+    ElMessage.error(body.message)
+    throw new HttpError(body.code, body.message)
   }
 
-  return response.json() as Promise<T>
+  // 成功: 取出 data 返回
+  return body.data as T
 }
 
 export const http = {
   get: <T = unknown>(url: string) => request<T>(url, { method: 'GET' }),
   post: <T = unknown>(url: string, body?: unknown) =>
-    request<T>(url, { method: 'POST', body: JSON.stringify(body) }),
+    request<T>(url, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
   put: <T = unknown>(url: string, body?: unknown) =>
-    request<T>(url, { method: 'PUT', body: JSON.stringify(body) }),
+    request<T>(url, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   patch: <T = unknown>(url: string, body?: unknown) =>
-    request<T>(url, { method: 'PATCH', body: JSON.stringify(body) }),
+    request<T>(url, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
   delete: <T = unknown>(url: string) =>
     request<T>(url, { method: 'DELETE' }),
 }

@@ -3,9 +3,6 @@
  * 登录页 — Claude Design System 风格
  * 布局: 左侧品牌展示区 + 右侧登录表单
  * 主题: 暖纸色背景 + 赤陶主色 + Newsreader 衬线大标题
- *
- * 默认账号(种子数据):
- *   管理员  admin / admin123
  */
 import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -52,7 +49,7 @@ async function submit() {
     loading.value = true
     try {
       await auth.login(form.username, form.password)
-      ElMessage.success(`欢迎回来,${auth.user?.username}`)
+      ElMessage.success('登录成功,正在进入控制台...')
       const redirect = (route.query.redirect as string) || '/admin'
       router.push({ path: redirect })
     } catch (e) {
@@ -61,11 +58,6 @@ async function submit() {
       loading.value = false
     }
   })
-}
-
-function fillDemo() {
-  form.username = 'admin'
-  form.password = 'admin123'
 }
 </script>
 
@@ -175,12 +167,6 @@ function fillDemo() {
             {{ loading ? '登录中…' : '登 录' }}
           </el-button>
         </el-form>
-
-        <!-- Demo 账号快捷填充 -->
-        <div class="auth-demo">
-          <span class="auth-demo-label">演示账号</span>
-          <el-button size="small" @click="fillDemo()">管理员 admin / admin123</el-button>
-        </div>
 
         <footer class="auth-form-footer">
           <span>还没有账号?</span>
@@ -386,25 +372,6 @@ function fillDemo() {
   font-weight: 600;
   letter-spacing: .04em;
   border-radius: var(--radius);
-}
-
-/* Demo 账号 */
-.auth-demo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 24px;
-  padding: 14px 16px;
-  background: var(--card);
-  border: 1px dashed var(--border-300);
-  border-radius: var(--radius);
-}
-.auth-demo-label {
-  font: 600 11px var(--font-mono);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-  margin-right: auto;
 }
 
 /* Footer */

@@ -2,24 +2,46 @@
 /**
  * 管理后台主框架
  * 布局: 左侧 Sidebar(品牌 + 导航) + 右侧主内容区(Header + 子路由出口)
- * 子路由出口由 router-view 渲染, 各业务页面在 views/admin/{模块}/index.vue
+ *
+ * 菜单从后端动态获取(根据当前登录用户角色), 不再前端写死
  */
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import {
-  Collection, User, Avatar, Lock, Menu, Odometer,
-  Sunny, Moon, SwitchButton,
-} from '@element-plus/icons-vue'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import { Sunny, Moon, SwitchButton } from '@element-plus/icons-vue'
 import { useTheme } from '@/composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
+import { useMenuStore, type MenuItem } from '@/stores/menu'
 
 const route = useRoute()
 const router = useRouter()
 const { theme, toggle } = useTheme()
 const auth = useAuthStore()
+const menuStore = useMenuStore()
 
-/* 当前激活的菜单 key(取路由 path 的最后一段) */
+// Element Plus 图标全集(用于动态渲染 <component :is="iconMap[name]" />)
+const iconMap = ElementPlusIconsVue as unknown as Record<string, any>
+
+/* 菜单加载状态 */
+const menuLoading = ref(false)
+
+/* 拉取菜单 */
+async function loadMenus() {
+  if (menuStore.loaded) return
+  menuLoading.value = true
+  try {
+    await menuStore.fetchCurrentUserMenus()
+  } catch {
+    // 401 由 http 拦截器处理, 这里兜底
+  } finally {
+    menuLoading.value = false
+  }
+}
+
+onMounted(loadMenus)
+
+/* 当前激活的菜单 key(取路由 path) */
 const activeMenu = computed(() => route.path)
 
 /* 菜单点击: EP Menu 的 router 模式会自动跳转, 这里仅兜底 */
@@ -27,16 +49,8 @@ function onMenuSelect(index: string) {
   router.push(index)
 }
 
-/* 当前页面标题(用于 Header 显示) */
-const pageTitleMap: Record<string, string> = {
-  '/admin/dashboard': '主控台',
-  '/admin/knowledge': '知识库管理',
-  '/admin/user': '用户管理',
-  '/admin/role': '角色管理',
-  '/admin/permission': '角色权限',
-  '/admin/menu': '菜单管理',
-}
-const pageTitle = computed(() => pageTitleMap[route.path] || '管理后台')
+/* 当前页面标题(从菜单数据查, 查不到用默认) */
+const pageTitle = computed(() => menuStore.getMenuName(route.path))
 
 /* 头像首字母 */
 const avatarText = computed(() => {
@@ -46,9 +60,16 @@ const avatarText = computed(() => {
 
 /* 退出登录 */
 function logout() {
-  auth.logout()
-  ElMessage.success('已退出登录')
+  auth.logout()          // store 内部统一弹提示
+  menuStore.reset()
   router.push('/login')
+}
+
+/* 递归渲染菜单项 */
+function renderIcon(iconName: string | null) {
+  if (!iconName) return null
+  const IconComp = iconMap[iconName]
+  return IconComp || null
 }
 </script>
 
@@ -60,42 +81,41 @@ function logout() {
         <span class="admin-brand-mark">E</span>
         <span class="admin-brand-text">Easy-Knowledge</span>
       </div>
+
       <el-menu
         :default-active="activeMenu"
         class="admin-menu"
         :router="true"
         @select="onMenuSelect"
       >
-        <el-menu-item-group title="概览">
-          <el-menu-item index="/admin/dashboard">
-            <el-icon><Odometer /></el-icon>
-            <span>主控台</span>
-          </el-menu-item>
-        </el-menu-item-group>
-        <el-menu-item-group title="知识库">
-          <el-menu-item index="/admin/knowledge">
-            <el-icon><Collection /></el-icon>
-            <span>知识库管理</span>
-          </el-menu-item>
-        </el-menu-item-group>
-        <el-menu-item-group title="系统">
-          <el-menu-item index="/admin/user">
-            <el-icon><User /></el-icon>
-            <span>用户管理</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/role">
-            <el-icon><Avatar /></el-icon>
-            <span>角色管理</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/permission">
-            <el-icon><Lock /></el-icon>
-            <span>角色权限</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/menu">
-            <el-icon><Menu /></el-icon>
-            <span>菜单管理</span>
-          </el-menu-item>
-        </el-menu-item-group>
+        <template v-if="menuLoading">
+          <div class="admin-menu-loading">加载菜单中...</div>
+        </template>
+        <template v-else>
+          <template v-for="node in menuStore.menus" :key="node.id">
+            <!-- 目录: 渲染为 group 分组标题 + 子菜单 -->
+            <el-menu-item-group v-if="node.type === 1" :title="node.name">
+              <el-menu-item
+                v-for="child in node.children"
+                :key="child.id"
+                :index="child.path || ''"
+              >
+                <el-icon v-if="renderIcon(child.icon)">
+                  <component :is="renderIcon(child.icon)" />
+                </el-icon>
+                <span>{{ child.name }}</span>
+              </el-menu-item>
+            </el-menu-item-group>
+
+            <!-- 菜单(无子项): 直接渲染 -->
+            <el-menu-item v-else-if="node.type === 2" :index="node.path || ''">
+              <el-icon v-if="renderIcon(node.icon)">
+                <component :is="renderIcon(node.icon)" />
+              </el-icon>
+              <span>{{ node.name }}</span>
+            </el-menu-item>
+          </template>
+        </template>
       </el-menu>
     </aside>
 
@@ -182,6 +202,11 @@ function logout() {
 .admin-menu {
   border-right: none;
   background: transparent;
+}
+.admin-menu-loading {
+  padding: 16px 12px;
+  color: var(--muted-foreground);
+  font-size: 13px;
 }
 
 /* Main */

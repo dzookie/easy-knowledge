@@ -8,12 +8,14 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '@/common/prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
+import { JwtPayload } from './strategies/jwt.strategy';
 
 /**
  * AuthService — 认证业务逻辑
- * - 登录校验(用户名 + 密码)
- * - 生成 JWT
- * - 更新登录信息
+ *
+ * 职责:
+ *  - login(): 校验账号密码, 签发 JWT, 仅返回 token
+ *  - getCurrentUserDetail(): 根据 JWT payload 查询当前登录用户详情(含角色信息)
  */
 @Injectable()
 export class AuthService {
@@ -26,16 +28,22 @@ export class AuthService {
   ) {}
 
   /**
-   * 登录
+   * 登录校验
    * @param dto 登录凭证
    * @param ip 登录 IP(从请求中提取)
+   * @returns 只返回 token, 用户信息走 /auth/current-user-detail
    */
-  async login(dto: LoginDto, ip?: string) {
-    // 1. 查询用户(排除软删除)
+  async login(dto: LoginDto, ip?: string): Promise<{ token: string }> {
+    // 1. 查询用户(排除软删除), include role 拿 role.code
     const user = await this.prisma.user.findFirst({
       where: {
         username: dto.username,
         deletedAt: null,
+      },
+      include: {
+        role: {
+          select: { code: true, name: true },
+        },
       },
     });
 
@@ -66,37 +74,27 @@ export class AuthService {
       },
     });
 
-    // 5. 生成 JWT
-    const payload = {
+    // 5. 签发 JWT
+    // payload.role 存 role.code (如 'admin' / 'user'), 前端用它判断权限
+    const payload: JwtPayload = {
       sub: user.id.toString(),
       username: user.username,
-      role: user.role,
+      role: user.role.code,
     };
     const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '7d');
     const token = await this.jwtService.signAsync(payload, { expiresIn });
 
-    this.logger.log(`用户登录成功: ${user.username} (id=${user.id})`);
+    this.logger.log(`用户登录成功: ${user.username} (id=${user.id}, role=${user.role.code})`);
 
-    return {
-      token,
-      user: {
-        id: user.id.toString(),
-        username: user.username,
-        nickname: user.nickname,
-        avatar: user.avatar,
-        role: user.role,
-      },
-    };
+    return { token };
   }
 
   /**
-   * 验证 JWT(供 JwtStrategy 调用)
+   * 查询当前登录用户详情
+   * @param payload JWT 解码后的 payload(sub 为用户 ID)
+   * @returns 用户信息(含角色, 用于前端 Header 渲染 + 权限判断)
    */
-  async validateUser(payload: {
-    sub: string;
-    username: string;
-    role: string;
-  }) {
+  async getCurrentUserDetail(payload: JwtPayload) {
     const user = await this.prisma.user.findFirst({
       where: {
         id: BigInt(payload.sub),
@@ -108,9 +106,34 @@ export class AuthService {
         username: true,
         nickname: true,
         avatar: true,
-        role: true,
+        email: true,
+        phone: true,
+        lastLoginAt: true,
+        lastLoginIp: true,
+        roleId: true,
+        role: {
+          select: { code: true, name: true },
+        },
       },
     });
-    return user;
+
+    if (!user) {
+      throw new UnauthorizedException('用户不存在或已被禁用');
+    }
+
+    // BigInt / DateTime 不能直接 JSON 序列化, 转为字符串
+    return {
+      id: user.id.toString(),
+      username: user.username,
+      nickname: user.nickname,
+      avatar: user.avatar,
+      email: user.email,
+      phone: user.phone,
+      lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
+      lastLoginIp: user.lastLoginIp,
+      roleId: user.roleId.toString(),
+      role: user.role.code,
+      roleName: user.role.name,
+    };
   }
 }
