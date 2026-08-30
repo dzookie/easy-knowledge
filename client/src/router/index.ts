@@ -32,6 +32,12 @@ const routes: RouteRecordRaw[] = [
         meta: { requiresAuth: true, title: '知识库管理 · Easy-Knowledge' },
       },
       {
+        path: 'knowledge/:id',
+        name: 'admin-knowledge-detail',
+        component: () => import('@/views/admin/knowledge/detail.vue'),
+        meta: { requiresAuth: true, title: '知识库详情 · Easy-Knowledge' },
+      },
+      {
         path: 'user',
         name: 'admin-user',
         component: () => import('@/views/admin/user/index.vue'),

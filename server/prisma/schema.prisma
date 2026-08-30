@@ -31,6 +31,9 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   deletedAt    DateTime? @map("deleted_at")
 
+  knowledgeBases KnowledgeBase[]
+  uploadedDocuments Document[] @relation("DocumentUploader")
+
   @@index([roleId])
   @@index([status])
   @@map("user")
@@ -92,4 +95,140 @@ model RoleMenu {
   @@id([roleId, menuId])
   @@index([menuId])
   @@map("role_menu")
+}
+
+/// 知识库
+/// 管理员可见全部, 普通用户仅可见自己创建的
+model KnowledgeBase {
+  id            BigInt    @id @default(autoincrement())
+  name          String    @db.VarChar(100)
+  description   String?   @db.VarChar(500)
+  /// 封面图(本地存储的相对路径或 URL), 预留
+  coverImage    String?   @map("cover_image") @db.VarChar(255)
+  /// 向量模型, 默认 bge-m3
+  embeddingModel String  @map("embedding_model") @db.VarChar(64) @default("bge-m3")
+  /// Qdrant collection 名, 全局唯一
+  collection    String    @unique @db.VarChar(128)
+  /// 切片策略: 固定长度 / 语义 / 递归, 预留枚举, 当前用字符串
+  chunkStrategy String    @map("chunk_strategy") @db.VarChar(32) @default("recursive")
+  /// 切片大小(token / 字符数)
+  chunkSize     Int       @map("chunk_size") @default(500)
+  /// 切片重叠
+  chunkOverlap  Int       @map("chunk_overlap") @default(50)
+  /// 创建者 id
+  createdBy     BigInt    @map("created_by")
+  creator       User      @relation(fields: [createdBy], references: [id])
+  /// 文档数(冗余统计, 更新时累加)
+  documentCount Int       @map("document_count") @default(0) @db.UnsignedInt
+  /// 切片(向量点)总数
+  chunkCount    Int       @map("chunk_count") @default(0) @db.UnsignedInt
+  /// 0 私有(仅创建者和管理员可见) / 1 团队(预留) / 2 公开(预留)
+  visibility    Int       @default(0) @db.TinyInt
+  /// 1 正常 / 0 禁用
+  status        Int       @default(1) @db.TinyInt
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  documents     Document[]
+  chunks        DocumentChunk[]
+
+  @@index([createdBy])
+  @@index([status])
+  @@map("knowledge_base")
+}
+
+/// 文档(某知识库下的原始文件, 对应一次用户上传)
+model Document {
+  id            BigInt      @id @default(autoincrement())
+  /// 所属知识库
+  kbId          BigInt      @map("kb_id")
+  knowledgeBase KnowledgeBase @relation(fields: [kbId], references: [id], onDelete: Cascade)
+
+  /// 用户看到的文件名(带扩展名)
+  fileName      String      @map("file_name") @db.VarChar(255)
+  /// MinIO 存储的 object key(或本地相对路径, v1 本地文件存储时用)
+  storageKey    String      @map("storage_key") @db.VarChar(512)
+  /// 文件大小(字节)
+  sizeBytes     BigInt      @map("size_bytes") @default(0)
+  /// 原始后缀, 不含点, 小写: pdf docx xlsx pptx md txt csv
+  fileType      String      @map("file_type") @db.VarChar(16)
+
+  /// 处理状态
+  /// 0=等待处理 1=处理中 2=处理成功 3=处理失败
+  status        Int         @default(0) @db.TinyInt
+  /// 错误信息(仅 status=3 时有值)
+  errorMsg      String?     @map("error_msg") @db.VarChar(500)
+  /// 切片总数(冗余,处理完成后回填)
+  chunkCount    Int         @map("chunk_count") @default(0) @db.UnsignedInt
+  /// 原始文档抽取后的总字符/字数(统计展示用)
+  totalChars    Int         @map("total_chars") @default(0) @db.UnsignedInt
+
+  /// 上传者
+  uploadedBy    BigInt      @map("uploaded_by")
+  uploader      User        @relation("DocumentUploader", fields: [uploadedBy], references: [id])
+
+  /// 解析 + 切片 + 向量化耗时(ms, 统计用)
+  processMs     Int?        @map("process_ms") @db.UnsignedInt
+  /// PDF/Excel 等页数/Sheet 数(统计展示用)
+  pageCount     Int?        @map("page_count") @db.UnsignedInt
+  /// 处理开始时间(用于耗时计算)
+  startedAt     DateTime?   @map("started_at")
+
+  /// 切片集合(软删文档时级联清理)
+  chunks        DocumentChunk[]
+
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  finishedAt    DateTime?   @map("finished_at")
+  deletedAt     DateTime?   @map("deleted_at")
+  /// 删除者(软删操作人)
+  deletedBy     BigInt?     @map("deleted_by")
+
+  @@index([kbId])
+  @@index([uploadedBy])
+  @@index([status])
+  @@map("document")
+}
+
+/// 文档切片(向量化最小单元, 每个 chunk 对应 Qdrant 一个 point, pointId 可由 id 映射)
+model DocumentChunk {
+  id            BigInt      @id @default(autoincrement())
+  /// 所属文档
+  documentId    BigInt      @map("document_id")
+  document      Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  /// 所属知识库(冗余,便于按知识库快速删除 Qdrant)
+  kbId          BigInt      @map("kb_id")
+  knowledgeBase KnowledgeBase @relation(fields: [kbId], references: [id], onDelete: Cascade)
+
+  /// 切片序号(从 0 开始, 同一文档下唯一, 列表排序用)
+  chunkIndex    Int         @map("chunk_index") @default(0)
+  /// chunk 文本(原始内容,用于显示/喂给LLM)
+  content       String      @db.Text
+
+  /// 切片元数据:类型 text/table_row/table_whole...
+  chunkType     String      @map("chunk_type") @db.VarChar(32) @default("text")
+  /// 在原文中的位置: 行号/页码/起始字符索引, JSON 格式
+  position      String?     @db.VarChar(500)
+  /// 父 chunk id(父子 chunk 模式)
+  parentId      BigInt?     @map("parent_id")
+
+  /// token 数(暂时未精确计算, 预留 0)
+  tokenCount    Int         @map("token_count") @default(0) @db.UnsignedInt
+  /// 字符数(content.length, 用于 chunk-detail Tab 快速展示)
+  charCount     Int         @map("char_count") @default(0) @db.UnsignedInt
+
+  /// Qdrant point id(UUID 字符串)
+  vectorId      String      @map("vector_id") @unique @db.VarChar(64)
+  /// 已写入 Qdrant(1是 0否)
+  indexed       Int         @default(0) @db.TinyInt
+
+  createdAt     DateTime    @default(now()) @map("created_at")
+  deletedAt     DateTime?   @map("deleted_at")
+
+  @@index([documentId])
+  @@index([kbId])
+  @@index([indexed])
+  @@index([documentId, chunkIndex])
+  @@map("document_chunk")
 }

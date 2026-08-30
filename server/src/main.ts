@@ -59,11 +59,13 @@ async function bootstrap() {
 
   // ===== 启动 =====
   const port = configService.get<number>('PORT', 3000);
-  await app.listen(port);
+  // 显式监听 0.0.0.0: 同时接受 IPv4 127.0.0.1 和 IPv6 ::1
+  // (Windows 下 localhost 常被解析成 IPv6 ::1, 若只绑 127.0.0.1 会 Vite 代理 ECONNREFUSED)
+  await app.listen(port, '0.0.0.0');
 
   const logger = new Logger('Bootstrap');
-  logger.log(`🚀 服务已启动: http://localhost:${port}`);
-  logger.log(`📖 API 文档: http://localhost:${port}/docs`);
+  logger.log(`🚀 服务已启动: http://127.0.0.1:${port}  (双栈 0.0.0.0)`);
+  logger.log(`📖 API 文档: http://127.0.0.1:${port}/docs`);
   logger.log(`🌐 CORS 允许来源: ${clientOrigin}`);
 }
 bootstrap();
