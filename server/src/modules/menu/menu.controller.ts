@@ -4,7 +4,8 @@ import { MenuService } from './menu.service';
 import { MenuItemDto } from './dto/menu-item.dto';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
-import { CurrentUser, AuthenticatedUser } from '@/common/decorators/current-user.decorator';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '@/common/types';
 
 /**
  * MenuController — 菜单接口

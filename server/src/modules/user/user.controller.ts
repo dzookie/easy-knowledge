@@ -3,7 +3,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto, ResetPasswordDto } from './dto/update-user.dto';
-import { CurrentUser, AuthenticatedUser } from '@/common/decorators/current-user.decorator';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '@/common/types';
 
 /**
  * UserController — 用户管理接口

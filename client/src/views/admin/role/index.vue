@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 角色管理 — 列表 + 新增/编辑/删除
  *
@@ -14,7 +14,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Refresh, Lock, User } from '@element-plus/icons-vue'
-import { http } from '@/utils/http'
+import { roleApis } from '@/apis'
 
 const router = useRouter()
 
@@ -66,7 +66,7 @@ const form = reactive<RoleForm>(defaultForm())
 async function loadRoles() {
   loading.value = true
   try {
-    tableData.value = await http.get<RoleRow[]>('/api/role')
+    tableData.value = await roleApis.listRole()
   } finally {
     loading.value = false
   }
@@ -107,10 +107,10 @@ async function handleSubmit() {
   submitting.value = true
   try {
     if (form.id) {
-      await http.put(`/api/role/${form.id}`, form)
+      await roleApis.updateRole(form.id, form)
       ElMessage.success('角色修改成功')
     } else {
-      await http.post('/api/role', form)
+      await roleApis.createRole(form)
       ElMessage.success('角色新增成功')
     }
     dialogVisible.value = false
@@ -130,7 +130,7 @@ async function handleDelete(row: RoleRow) {
       '删除确认',
       { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
     )
-    await http.delete(`/api/role/${row.id}`)
+    await roleApis.deleteRole(row.id)
     ElMessage.success('角色删除成功')
     await loadRoles()
   } catch (e: any) {

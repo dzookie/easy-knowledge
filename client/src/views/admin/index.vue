@@ -12,7 +12,8 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { Sunny, Moon, SwitchButton } from '@element-plus/icons-vue'
 import { useTheme } from '@/composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
-import { useMenuStore, type MenuItem } from '@/stores/menu'
+import { useMenuStore } from '@/stores/menu'
+import type { MenuItem } from '@/types'
 
 const route = useRoute()
 const router = useRouter()

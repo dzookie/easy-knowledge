@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useMenuStore — 菜单状态管理
  *
  * 职责:
@@ -8,19 +8,8 @@
  */
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { http } from '@/utils/http'
-
-export interface MenuItem {
-  id: string
-  parentId: string
-  name: string
-  type: number          // 1目录 2菜单 3按钮
-  path: string | null
-  icon: string | null
-  sort: number
-  visible: boolean
-  children: MenuItem[]
-}
+import { menuApis } from '@/apis'
+import type { MenuItem } from '@/types'
 
 export const useMenuStore = defineStore('menu', () => {
   const menus = ref<MenuItem[]>([])
@@ -28,7 +17,7 @@ export const useMenuStore = defineStore('menu', () => {
 
   /** 拉取当前登录用户的菜单树 */
   async function fetchCurrentUserMenus(): Promise<void> {
-    const data = await http.get<MenuItem[]>('/api/menu/current-user-menus')
+    const data = await menuApis.getCurrentUserMenus()
     menus.value = data
     loaded.value = true
   }

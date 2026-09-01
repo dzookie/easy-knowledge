@@ -96,7 +96,7 @@ async function submit() {
             <el-icon><Tools /></el-icon>
             <div>
               <strong>多模型适配</strong>
-              <span>bge-m3 / Doubao / Ollama 自由切换</span>
+              <span>qwen3.7 / Doubao / Ollama 自由切换</span>
             </div>
           </li>
         </ul>

@@ -7,9 +7,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma/prisma.service';
 import { StorageService } from '@/common/storage/storage.service';
-import { AuthenticatedUser } from '@/common/decorators/current-user.decorator';
+import { AuthenticatedUser, PaginationResult } from '@/common/types';
 import { PipelineService } from './pipeline.service';
 import { DocumentListQueryDto } from './dto/document-list.dto';
+import { ChunkListQueryDto } from './dto/chunk-list.dto';
 import { createParserByExt, allExtensions } from './parsers';
 import { normalizeFilename } from '@/common/utils/encoding';
 import * as path from 'node:path';
@@ -100,7 +101,7 @@ export class DocumentService {
   }
 
   /** 列表分页 */
-  async listDocuments(user: AuthenticatedUser, query: DocumentListQueryDto) {
+  async listDocuments(user: AuthenticatedUser, query: DocumentListQueryDto): Promise<PaginationResult<any>> {
     const page = Number(query.page || 1);
     const pageSize = Number(query.pageSize || 20);
     // 前端可能在路由 params 初始化期间发起一次空 kbId 请求, 这里直接返回空列表避免 400 日志
@@ -197,6 +198,80 @@ export class DocumentService {
       });
 
     return { success: true, documentId: doc.id.toString() };
+  }
+
+  /** 分页查询切片列表 (按知识库维度, 可选按文档过滤) */
+  async listChunks(
+    user: AuthenticatedUser,
+    query: ChunkListQueryDto,
+  ): Promise<PaginationResult<any>> {
+    const page = Number(query.page || 1);
+    const pageSize = Number(query.pageSize || 20);
+
+    if (!query.kbId) {
+      return { items: [], total: 0, page, pageSize };
+    }
+
+    const kbIdB = BigInt(query.kbId);
+
+    // 鉴权: 检查知识库可见性
+    const kb = await this.prisma.knowledgeBase.findFirst({
+      where: { id: kbIdB, deletedAt: null },
+      select: { createdBy: true, visibility: true },
+    });
+    if (!kb) throw new NotFoundException('知识库不存在');
+    const canView =
+      user.role === 'admin' ||
+      kb.createdBy === BigInt(user.id) ||
+      kb.visibility !== 0;
+    if (!canView) throw new ForbiddenException('无权限访问该知识库');
+
+    const where: any = {
+      kbId: kbIdB,
+      deletedAt: null,
+    };
+    if (query.docId) {
+      where.documentId = BigInt(query.docId);
+    }
+
+    const [rows, total] = await Promise.all([
+      this.prisma.documentChunk.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: [{ documentId: 'asc' }, { chunkIndex: 'asc' }],
+        include: {
+          document: {
+            select: { id: true, fileName: true, fileType: true },
+          },
+        },
+      }),
+      this.prisma.documentChunk.count({ where }),
+    ]);
+
+    return {
+      page,
+      pageSize,
+      total,
+      items: rows.map((c) => ({
+        id: c.id.toString(),
+        documentId: c.documentId.toString(),
+        chunkIndex: c.chunkIndex,
+        content: c.content,
+        chunkType: c.chunkType,
+        position: c.position,
+        charCount: c.charCount,
+        tokenCount: c.tokenCount,
+        vectorId: c.vectorId,
+        indexed: c.indexed,
+        createdAt: c.createdAt.toISOString(),
+        document: {
+          id: c.document.id.toString(),
+          fileName: c.document.fileName,
+          fileType: c.document.fileType,
+        },
+      })),
+    };
   }
 
   /* ========== helpers ========== */

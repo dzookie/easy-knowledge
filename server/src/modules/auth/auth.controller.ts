@@ -5,7 +5,8 @@ import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { CurrentUserDetailDto } from './dto/current-user-detail.dto';
 import { Public } from '@/common/decorators/public.decorator';
-import { CurrentUser, AuthenticatedUser } from '@/common/decorators/current-user.decorator';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '@/common/types';
 
 /**
  * AuthController — 认证接口

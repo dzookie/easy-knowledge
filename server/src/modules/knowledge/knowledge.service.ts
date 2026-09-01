@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma/prisma.service';
 import { QdrantService } from '@/common/qdrant/qdrant.service';
-import { AuthenticatedUser } from '@/common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '@/common/types';
 import { CreateKnowledgeDto } from './dto/create-knowledge.dto';
 import { UpdateKnowledgeDto } from './dto/update-knowledge.dto';
 
@@ -100,6 +100,12 @@ export class KnowledgeService implements OnModuleInit {
         creator: {
           select: { id: true, username: true, nickname: true, avatar: true },
         },
+        _count: {
+          select: {
+            documents: { where: { deletedAt: null } },
+            chunks: { where: { deletedAt: null } },
+          },
+        },
       },
       orderBy: [{ status: 'desc' }, { createdAt: 'desc' }],
     });
@@ -114,8 +120,8 @@ export class KnowledgeService implements OnModuleInit {
       chunkStrategy: kb.chunkStrategy,
       chunkSize: kb.chunkSize,
       chunkOverlap: kb.chunkOverlap,
-      documentCount: kb.documentCount,
-      chunkCount: kb.chunkCount,
+      documentCount: kb._count.documents,
+      chunkCount: kb._count.chunks,
       visibility: kb.visibility,
       status: kb.status,
       createdBy: kb.createdBy.toString(),
@@ -139,6 +145,12 @@ export class KnowledgeService implements OnModuleInit {
       where: { id: kbId, deletedAt: null },
       include: {
         creator: { select: { id: true, username: true, nickname: true, avatar: true } },
+        _count: {
+          select: {
+            documents: { where: { deletedAt: null } },
+            chunks: { where: { deletedAt: null } },
+          },
+        },
       },
     });
     if (!kb) throw new NotFoundException('知识库不存在');
@@ -161,8 +173,8 @@ export class KnowledgeService implements OnModuleInit {
       chunkStrategy: kb.chunkStrategy,
       chunkSize: kb.chunkSize,
       chunkOverlap: kb.chunkOverlap,
-      documentCount: kb.documentCount,
-      chunkCount: kb.chunkCount,
+      documentCount: kb._count.documents,
+      chunkCount: kb._count.chunks,
       visibility: kb.visibility,
       status: kb.status,
       createdBy: kb.createdBy.toString(),
@@ -188,7 +200,7 @@ export class KnowledgeService implements OnModuleInit {
         data: {
           name: dto.name,
           description: dto.description ?? null,
-          embeddingModel: dto.embeddingModel ?? 'bge-m3',
+          embeddingModel: dto.embeddingModel ?? 'qwen3.7-text-embedding',
           collection: 'pending',
           chunkStrategy: dto.chunkStrategy ?? 'recursive',
           chunkSize: dto.chunkSize ?? 500,

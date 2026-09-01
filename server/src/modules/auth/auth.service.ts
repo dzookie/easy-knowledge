@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '@/common/prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
-import { JwtPayload } from './strategies/jwt.strategy';
+import { JwtPayload } from '@/common/types';
 
 /**
  * AuthService — 认证业务逻辑

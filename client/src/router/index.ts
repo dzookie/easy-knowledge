@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { HttpError } from '@/utils/http'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -105,9 +106,13 @@ router.beforeEach(async (to) => {
     if (!auth.userLoaded) {
       try {
         await auth.fetchCurrentUserDetail()
-      } catch {
-        // 拉取失败(401 已被 http 拦截器 logout, 这里兜底跳登录)
-        return { path: '/login', query: { redirect: to.fullPath } }
+      } catch (err) {
+        // 401: token 无效, http 拦截器已 logout, 跳登录
+        if (err instanceof HttpError && err.code === 401) {
+          return { path: '/login', query: { redirect: to.fullPath } }
+        }
+        // 网络错误(后端没启动等): 不跳登录, 放行用 localStorage 缓存的用户信息
+        // 避免 "fetch 失败 → 跳 /login → 发现已登录跳回 /admin → 又 fetch → 死循环"
       }
     }
   }

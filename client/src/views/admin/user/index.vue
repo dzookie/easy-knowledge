@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 用户管理 — 列表 + 新增/编辑/删除/重置密码
  *
@@ -13,44 +13,11 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Refresh, Key } from '@element-plus/icons-vue'
-import { http } from '@/utils/http'
+import { userApis } from '@/apis'
 import { useAuthStore } from '@/stores/auth'
+import type { UserRow, RoleOption, UserForm } from '@/types'
 
 const auth = useAuthStore()
-
-/* ===== 类型 ===== */
-interface UserRow {
-  id: string
-  username: string
-  nickname: string | null
-  email: string | null
-  phone: string | null
-  avatar: string | null
-  roleId: string
-  roleName: string
-  roleCode: string
-  status: number
-  lastLoginAt: string | null
-  lastLoginIp: string | null
-  createdAt: string
-}
-
-interface RoleOption {
-  id: string
-  name: string
-  code: string
-}
-
-interface UserForm {
-  id?: string
-  username: string
-  password: string
-  nickname: string
-  email: string
-  phone: string
-  roleId: string
-  status: number
-}
 
 /* ===== 状态 ===== */
 const loading = ref(false)
@@ -86,7 +53,7 @@ const form = reactive<UserForm>(defaultForm())
 async function loadUsers() {
   loading.value = true
   try {
-    tableData.value = await http.get<UserRow[]>('/api/user')
+    tableData.value = await userApis.listUser()
   } finally {
     loading.value = false
   }
@@ -94,10 +61,10 @@ async function loadUsers() {
 
 /* 加载角色列表(下拉选项) */
 async function loadRoles() {
-  roleOptions.value = await http.get<RoleOption[]>('/api/role')
+  roleOptions.value = await userApis.listRoleOptions()
   // 新增时默认选第一个角色
   if (roleOptions.value.length > 0) {
-    form.roleId = roleOptions.value[0].id
+    form.roleId = roleOptions.value[0]!.id
   }
 }
 
@@ -106,7 +73,7 @@ function openCreate() {
   dialogTitle.value = '新增用户'
   Object.assign(form, defaultForm())
   if (roleOptions.value.length > 0) {
-    form.roleId = roleOptions.value[0].id
+    form.roleId = roleOptions.value[0]!.id
   }
   dialogVisible.value = true
 }
@@ -147,10 +114,10 @@ async function handleSubmit() {
     if (form.id) {
       // 编辑(不含 password)
       const { password, ...payload } = form
-      await http.put(`/api/user/${form.id}`, payload)
+      await userApis.updateUser(form.id, payload)
       ElMessage.success('用户修改成功')
     } else {
-      await http.post('/api/user', form)
+      await userApis.createUser(form)
       ElMessage.success('用户新增成功')
     }
     dialogVisible.value = false
@@ -170,7 +137,7 @@ async function handleDelete(row: UserRow) {
       '删除确认',
       { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
     )
-    await http.delete(`/api/user/${row.id}`)
+    await userApis.deleteUser(row.id)
     ElMessage.success('用户删除成功')
     await loadUsers()
   } catch (e: any) {
@@ -196,8 +163,8 @@ async function handleResetPwd() {
   }
   pwdSubmitting.value = true
   try {
-    await http.put(`/api/user/${pwdForm.id}/reset-password`, {
-      newPassword: pwdForm.newPassword,
+    await userApis.resetPassword(pwdForm.id, {
+      password: pwdForm.newPassword,
     })
     ElMessage.success('密码重置成功')
     pwdDialogVisible.value = false

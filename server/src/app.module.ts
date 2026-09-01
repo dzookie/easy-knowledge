@@ -10,6 +10,7 @@ import { RoleModule } from './modules/role/role.module';
 import { UserModule } from './modules/user/user.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { DocumentModule } from './modules/document/document.module';
+import { RetrievalModule } from './modules/retrieval/retrieval.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { DocumentModule } from './modules/document/document.module';
     UserModule,
     KnowledgeModule,
     DocumentModule,
+    RetrievalModule,
   ],
 })
 export class AppModule {}

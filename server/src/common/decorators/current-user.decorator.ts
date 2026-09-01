@@ -1,4 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { AuthenticatedUser } from '@/common/types';
 
 /**
  * @CurrentUser() — 从请求中取出当前登录用户
@@ -8,16 +9,9 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
  *   async someMethod(@CurrentUser('id') userId: string) { ... }
  *
  * 前置条件: 接口必须经过 JwtAuthGuard 鉴权, 否则 req.user 为 undefined
+ *
+ * 注意: AuthenticatedUser 类型定义已移至 @/common/types/auth.types.ts
  */
-export interface AuthenticatedUser {
-  id: string;            // 用户 ID(已字符串化的 BigInt)
-  username: string;
-  nickname: string | null;
-  avatar: string | null;
-  roleId: string;        // 角色 ID(已字符串化的 BigInt, 关联 role 表)
-  role: string;          // role.code (如 'admin' / 'user')
-}
-
 export const CurrentUser = createParamDecorator(
   (data: keyof AuthenticatedUser | undefined, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();

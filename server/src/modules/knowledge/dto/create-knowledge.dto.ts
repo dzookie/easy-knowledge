@@ -25,9 +25,9 @@ export class CreateKnowledgeDto {
   description?: string;
 
   @ApiPropertyOptional({
-    example: 'bge-m3',
-    description: '向量模型, 默认 bge-m3',
-    default: 'bge-m3',
+    example: 'qwen3.7-text-embedding',
+    description: '向量模型, 默认 qwen3.7-text-embedding',
+    default: 'qwen3.7-text-embedding',
   })
   @IsOptional()
   @IsString()

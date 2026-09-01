@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useAuthStore — 认证状态管理
  *
  * 策略(方案 B):
@@ -9,26 +9,12 @@
  */
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { http, HttpError } from '@/utils/http'
+import { HttpError } from '@/utils/http'
+import { authApis } from '@/apis'
+import type { UserInfo } from '@/types'
 
 const TOKEN_KEY = 'ek-token'
 const USER_KEY = 'ek-user'
-
-export type UserRole = 'admin' | 'user'
-
-export interface UserInfo {
-  id: string
-  username: string
-  nickname: string | null
-  avatar: string | null
-  roleId: string         // 角色 ID(关联后端 role 表)
-  role: UserRole         // role.code: 'admin' / 'user'
-  roleName: string       // 角色名称(展示用,如"管理员")
-  email: string | null
-  phone: string | null
-  lastLoginAt: string | null
-  lastLoginIp: string | null
-}
 
 function readUser(): UserInfo | null {
   const s = localStorage.getItem(USER_KEY)
@@ -50,10 +36,7 @@ export const useAuthStore = defineStore('auth', () => {
    * 用户信息不在这里拉取, 由路由守卫统一调 fetchCurrentUserDetail()
    */
   async function login(username: string, password: string): Promise<void> {
-    const res = await http.post<{ token: string }>('/api/auth/login', {
-      username,
-      password,
-    })
+    const res = await authApis.login({ username, password })
     token.value = res.token
     userLoaded.value = false
     localStorage.setItem(TOKEN_KEY, res.token)
@@ -67,12 +50,15 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchCurrentUserDetail(): Promise<void> {
     if (!token.value) return
     try {
-      const detail = await http.get<UserInfo>('/api/auth/current-user-detail')
+      const detail = await authApis.getCurrentUserDetail()
       user.value = detail
       userLoaded.value = true
       localStorage.setItem(USER_KEY, JSON.stringify(detail))
     } catch (err) {
-      // 401 由 http 拦截器统一处理(自动 logout), 这里只兜底其他错误
+      // 关键: 无论成功失败都标记 userLoaded=true, 避免路由守卫死循环
+      // (后端没启动时 fetch 失败 -> 跳 /login -> /login 发现已登录跳回 /admin
+      //  -> userLoaded 还是 false -> 又调 fetchCurrentUserDetail -> 无限循环)
+      userLoaded.value = true
       if (err instanceof HttpError) {
         throw err
       }

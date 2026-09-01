@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 菜单管理 — 树形表格 + 新增/编辑/删除
  *
@@ -13,7 +13,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Refresh, Menu as MenuIcon, Search, Close } from '@element-plus/icons-vue'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-import { http } from '@/utils/http'
+import { menuApis } from '@/apis'
 import { useMenuStore } from '@/stores/menu'
 
 const menuStore = useMenuStore()
@@ -141,7 +141,7 @@ watch(
 async function loadMenus() {
   loading.value = true
   try {
-    tableData.value = await http.get<MenuRow[]>('/api/menu')
+    tableData.value = await menuApis.listMenu() as any
     buildParentOptions()
   } finally {
     loading.value = false
@@ -214,11 +214,11 @@ async function handleSubmit() {
   try {
     const payload = { ...form }
     if (form.id) {
-      await http.put(`/api/menu/${form.id}`, payload)
+      await menuApis.updateMenu(form.id, payload)
       ElMessage.success('菜单修改成功')
     } else {
       delete (payload as any).id
-      await http.post('/api/menu', payload)
+      await menuApis.createMenu(payload)
       ElMessage.success('菜单新增成功')
     }
     dialogVisible.value = false
@@ -240,7 +240,7 @@ async function handleDelete(row: MenuRow) {
       '删除确认',
       { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
     )
-    await http.delete(`/api/menu/${row.id}`)
+    await menuApis.deleteMenu(row.id)
     ElMessage.success('菜单删除成功')
     await loadMenus()
     // 刷新侧栏菜单缓存

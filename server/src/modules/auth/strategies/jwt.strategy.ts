@@ -3,22 +3,14 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/common/prisma/prisma.service';
-
-/**
- * JwtPayload — JWT token 中携带的信息
- * role 存的是 role.code (如 'admin' / 'user'), 不是 role.id
- * 这样前端权限判断不用每次查库, 但改角色后需重新登录生效
- */
-export interface JwtPayload {
-  sub: string;       // 用户 ID(字符串化的 BigInt)
-  username: string;
-  role: string;      // role.code (如 'admin' / 'user')
-}
+import { JwtPayload } from '@/common/types';
 
 /**
  * JwtStrategy — JWT 鉴权策略
  * 从 Authorization Bearer token 中解析用户身份
  * 验证通过后将 user 挂载到 req.user
+ *
+ * 注意: JwtPayload 类型定义已移至 @/common/types/auth.types.ts
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {

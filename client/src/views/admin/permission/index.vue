@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 角色权限 — 左角色列表 + 右菜单树勾选
  *
@@ -11,34 +11,11 @@
 import { nextTick, onMounted, ref } from 'vue'
 import { ElMessage, ElTree } from 'element-plus'
 import { Refresh, Lock } from '@element-plus/icons-vue'
-import { http } from '@/utils/http'
+import { roleApis, menuApis } from '@/apis'
 import { useMenuStore } from '@/stores/menu'
+import type { RoleRow, MenuNode } from '@/types'
 
 const menuStore = useMenuStore()
-
-/* ===== 类型 ===== */
-interface RoleRow {
-  id: string
-  code: string
-  name: string
-  description: string | null
-  sort: number
-  status: number
-  userCount: number
-  menuCount: number
-  createdAt: string
-}
-
-interface MenuNode {
-  id: string
-  parentId: string
-  name: string
-  type: number        // 1目录 2菜单 3按钮
-  path: string | null
-  icon: string | null
-  sort: number
-  children?: MenuNode[]
-}
 
 /* ===== 状态 ===== */
 const loadingRoles = ref(false)
@@ -64,10 +41,10 @@ const treeProps = {
 async function loadRoles() {
   loadingRoles.value = true
   try {
-    roles.value = await http.get<RoleRow[]>('/api/role')
+    roles.value = await roleApis.listRole()
     // 默认选中第一个角色
     if (roles.value.length > 0 && !currentRoleId.value) {
-      await selectRole(roles.value[0].id)
+      await selectRole(roles.value[0]!.id)
     }
   } finally {
     loadingRoles.value = false
@@ -78,7 +55,7 @@ async function loadRoles() {
 async function loadMenuTree() {
   loadingMenus.value = true
   try {
-    menuTreeData.value = await http.get<MenuNode[]>('/api/menu')
+    menuTreeData.value = await menuApis.listMenu()
   } finally {
     loadingMenus.value = false
   }
@@ -97,7 +74,7 @@ async function selectRole(id: string) {
   if (!treeRef.value) return
 
   try {
-    const { menuIds } = await http.get<{ menuIds: string[] }>(`/api/role/${id}/menus`)
+    const { menuIds } = await roleApis.getRoleMenus(id)
     // 只勾选叶子节点, 父级由 tree 自动计算半选/全选
     // (若传入父节点 id, el-tree 会把该父级置为全选并联动勾选全部子级, 导致数据失真)
     const leafIdSet = collectLeafIds(menuTreeData.value)
@@ -137,7 +114,7 @@ async function handleSave() {
 
   submitting.value = true
   try {
-    await http.put(`/api/role/${currentRoleId.value}/menus`, { menuIds })
+    await roleApis.assignMenus(currentRoleId.value, menuIds)
     ElMessage.success('权限保存成功')
     // 刷新角色列表以更新 menuCount
     await loadRolesSilently()
@@ -152,7 +129,7 @@ async function handleSave() {
 
 /* 静默刷新角色列表(保留当前选中) */
 async function loadRolesSilently() {
-  const list = await http.get<RoleRow[]>('/api/role')
+  const list = await roleApis.listRole()
   roles.value = list
 }
 

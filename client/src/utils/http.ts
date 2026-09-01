@@ -1,18 +1,23 @@
 /**
- * HTTP 客户端 — 基于 fetch 的轻量封装
+ * HTTP 客户端 — 基于 axios 的封装
  * - 自动携带 Authorization Bearer token
  * - 适配后端统一响应格式 { code, message, data }
  * - 401 自动登出
+ *
+ * 注意: ApiResponse / RequestOptions / PostFormOptions 类型定义已移至 @/types/api.ts
+ *       此处 re-export 保持向后兼容 (已有大量文件从 @/utils/http 导入这些类型)
  */
+import axios, {
+  type AxiosResponse,
+  type AxiosInstance,
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+  type Method,
+} from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
-
-/** 后端统一响应结构 */
-export interface ApiResponse<T = unknown> {
-  code: number        // 200=成功, 其他=错误
-  message: string
-  data: T | null
-}
+import type { ApiResponse, RequestOptions, PostFormOptions } from '@/types'
+export type { ApiResponse, RequestOptions, PostFormOptions }
 
 export class HttpError extends Error {
   constructor(
@@ -23,203 +28,124 @@ export class HttpError extends Error {
   }
 }
 
-/** 额外请求选项 */
-export interface RequestOptions {
-  /** 查询参数 (自动拼到 URL 上, value=undefined/null 会跳过) */
-  params?: Record<string, any>
-  /** 请求体 (POST/PUT/PATCH 等用, 默认 JSON 序列化) */
-  body?: unknown
-  /** 自定义请求头 (Content-Type 缺省默认 application/json; 传 form-data 时请不要写 Content-Type 让浏览器自动处理) */
-  headers?: Record<string, string>
-  /** HTTP method, 主要给 request 内部用, http.get/post 等已固定 */
-  method?: string
-}
-
-/** postForm 上传表单(含文件)选项 */
-export interface PostFormOptions {
-  /** 查询参数 */
-  params?: Record<string, any>
-  /** 自定义请求头 (不要手动写 Content-Type, 由浏览器自动处理 boundary) */
-  headers?: Record<string, string>
-  /** 上传进度百分比回调 0-100 (基于 XMLHttpRequest.upload.onprogress) */
-  onProgress?: (percent: number) => void
-}
-
-/** 带上传进度的 FormData 请求 (基于 XMLHttpRequest)
- *
- * ⚠️ 为什么不用 fetch: fetch 标准至今仍不支持 request body 上传进度, 只能走 XMLHttpRequest
- *    响应体解析 / 错误处理和 request() 保持一致:
- *    - 成功解 { code: 200, message, data } 里的 data
- *    - code !== 200 / 401 / HTTP 错误 -> 抛 HttpError, 自动弹 ElMessage, 401 自动登出
+/** axios 实例
+ *  - 不设 baseURL: 调用方传 /api/... 走 Vite proxy
+ *  - 不设 timeout: 上传大文件不应被前端超时打断 (后端 multer 已限单文件 150MB)
  */
-async function requestForm<T = unknown>(
-  url: string,
-  form: FormData,
-  opts: PostFormOptions = {},
-): Promise<T> {
-  const auth = useAuthStore()
-  return new Promise((resolve, reject) => {
-    // 拼 query 参数
-    let finalUrl = url
-    if (opts.params && Object.keys(opts.params).length) {
+const axiosInstance: AxiosInstance = axios.create({
+  // 兼容原 RequestOptions.params 的处理方式:
+  //   - undefined / null 跳过
+  //   - 数组 join(',') (后端按逗号分隔接收)
+  //   - 空串跳过, 避免后端收到 kbId=&... 被当成空值
+  paramsSerializer: {
+    serialize: (params: Record<string, any>) => {
       const qs = new URLSearchParams()
-      for (const [k, v] of Object.entries(opts.params)) {
+      for (const [k, v] of Object.entries(params || {})) {
         if (v === undefined || v === null) continue
         const s = Array.isArray(v) ? v.join(',') : String(v)
         if (s === '') continue
         qs.append(k, s)
       }
-      const str = qs.toString()
-      if (str) finalUrl += (finalUrl.includes('?') ? '&' : '?') + str
-    }
+      return qs.toString()
+    },
+  },
+})
 
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', finalUrl, true)
-    // 自定义 headers
-    if (opts.headers) {
-      for (const [k, v] of Object.entries(opts.headers)) xhr.setRequestHeader(k, v)
-    }
-    // 鉴权
-    if (auth.token) xhr.setRequestHeader('Authorization', `Bearer ${auth.token}`)
-    // ⚠️ 不要 setRequestHeader('Content-Type') — FormData 必须让浏览器自动带 boundary
-
-    // 上传进度
-    if (xhr.upload && opts.onProgress) {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable && e.total > 0) {
-          const p = Math.max(0, Math.min(100, Math.round((e.loaded / e.total) * 100)))
-          opts.onProgress!(p)
-        }
-      }
-    }
-
-    xhr.onload = () => {
-      let body: ApiResponse<T>
-      try {
-        body = JSON.parse(xhr.responseText) as ApiResponse<T>
-      } catch {
-        const msg =
-          xhr.status >= 400 ? `上传失败: HTTP ${xhr.status}` : '响应解析失败 (非 JSON)'
-        ElMessage.error(msg)
-        reject(new HttpError(xhr.status || 500, msg))
-        return
-      }
-
-      if (body.code === 401 || xhr.status === 401) {
-        auth.logout(true)
-        ElMessage.error(body.message || '登录已过期,请重新登录')
-        reject(new HttpError(401, body.message || '登录已过期'))
-        return
-      }
-      if (body.code !== 200) {
-        ElMessage.error(body.message || '上传失败')
-        reject(new HttpError(body.code, body.message || '上传失败'))
-        return
-      }
-      resolve(body.data as T)
-    }
-
-    xhr.onerror = () => {
-      const msg = '网络异常,上传失败 (请检查后端是否启动)'
-      ElMessage.error(msg)
-      reject(new HttpError(0, msg))
-    }
-    xhr.onabort = () => {
-      reject(new HttpError(0, '上传已取消'))
-    }
-
-    xhr.send(form)
-  })
-}
-
-async function request<T = unknown>(
-  url: string,
-  options: RequestOptions = {},
-): Promise<T> {
+/** 请求拦截: 注入 token + 防御性清理 FormData 的 Content-Type */
+axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const auth = useAuthStore()
-  const headers: Record<string, string> = {
-    ...((options.headers as Record<string, string>) || {}),
-  }
-  // 默认 JSON (上传 multipart/form-data 时, 调用方请显式把 Content-Type 设为 '' 或不写, 由浏览器自动带 boundary)
-  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
-  if (!isFormData && !headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json'
-  }
-  if (isFormData && headers['Content-Type']) {
-    // FormData 必须让浏览器自动加 Content-Type: multipart/form-data; boundary=---xxx, 不能手动写
-    delete headers['Content-Type']
-  }
-
-  // 自动携带 token
   if (auth.token) {
-    headers['Authorization'] = `Bearer ${auth.token}`
+    config.headers.Authorization = `Bearer ${auth.token}`
   }
+  // FormData 必须让浏览器自动加 boundary, axios 检测到 FormData 已会自动处理,
+  // 这里清掉调用方误传的 Content-Type 避免破坏 boundary
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers.delete('Content-Type')
+  }
+  return config
+})
 
-  // 拼 query 参数
-  let finalUrl = url
-  if (options.params && Object.keys(options.params).length) {
-    const qs = new URLSearchParams()
-    for (const [k, v] of Object.entries(options.params)) {
-      if (v === undefined || v === null) continue
-      const s = Array.isArray(v) ? v.join(',') : String(v)
-      if (s === '') continue // 空串也跳过, 避免后端收到 kbId=&... 被当成空值
-      qs.append(k, s)
+/** 响应拦截: 解包 { code, message, data } 并统一错误处理
+ *  返回 body.data -> 调用方拿到的就是业务数据, 不再包 AxiosResponse
+ */
+axiosInstance.interceptors.response.use(
+  // HTTP 2xx 进入成功分支
+  (response) => {
+    const body = response.data as ApiResponse
+    // 401: token 失效, 清除登录态
+    if (body.code === 401) {
+      const auth = useAuthStore()
+      auth.logout(true)
+      ElMessage.error(body.message || '登录已过期,请重新登录')
+      throw new HttpError(401, body.message || '登录已过期')
     }
-    const str = qs.toString()
-    if (str) finalUrl += (finalUrl.includes('?') ? '&' : '?') + str
-  }
+    // 非 200: 业务错误
+    if (body.code !== 200) {
+      ElMessage.error(body.message)
+      throw new HttpError(body.code, body.message)
+    }
+    // 成功: 直接返回 data, 让调用方拿到业务数据 (拦截器返回值会被 axios 当成 AxiosResponse,
+    // 但运行时实际就是 body.data, 类型层做一次断言绕过)
+    return body.data as unknown as AxiosResponse
+  },
+  // HTTP 4xx/5xx 进入错误分支
+  (error) => {
+    // 401: 后端可能直接以 HTTP 401 返回 (例如 token 完全无效)
+    if (error.response?.status === 401) {
+      const auth = useAuthStore()
+      auth.logout(true)
+      const msg = error.response.data?.message || '登录已过期,请重新登录'
+      ElMessage.error(msg)
+      throw new HttpError(401, msg)
+    }
+    // 后端业务错误以 HTTP 4xx 返回时, body 里仍带 code/message
+    const body = error.response?.data as ApiResponse | undefined
+    if (body && typeof body.code === 'number') {
+      ElMessage.error(body.message || '请求失败')
+      throw new HttpError(body.code, body.message || '请求失败')
+    }
+    // 网络错误 / 超时 / 后端未启动
+    const msg = error.code === 'ECONNABORTED'
+      ? '请求超时'
+      : error.message?.includes('Network Error')
+        ? '网络异常 (请检查后端是否启动)'
+        : `HTTP ${error.response?.status ?? 0} 请求失败`
+    ElMessage.error(msg)
+    throw new HttpError(error.response?.status ?? 0, msg)
+  },
+)
 
-  const fetchOptions: RequestInit = {
-    method: options.method || 'GET',
-    headers,
+/** RequestOptions -> axios config 映射 */
+function toAxiosConfig(opts: RequestOptions): AxiosRequestConfig {
+  return {
+    method: (opts.method || 'GET') as Method,
+    headers: opts.headers,
+    params: opts.params,
+    data: opts.body,
   }
-  if (options.body !== undefined) {
-    fetchOptions.body = isFormData
-      ? (options.body as FormData)
-      : typeof options.body === 'string'
-        ? options.body
-        : JSON.stringify(options.body)
-  }
-
-  const response = await fetch(finalUrl, fetchOptions)
-
-  // 解析响应体(后端始终返回 { code, message, data })
-  let body: ApiResponse<T>
-  try {
-    body = await response.json() as ApiResponse<T>
-  } catch {
-    throw new HttpError(500, '响应解析失败')
-  }
-
-  // 401: token 失效, 清除登录态
-  if (body.code === 401 || response.status === 401) {
-    auth.logout(true)
-    ElMessage.error(body.message || '登录已过期,请重新登录')
-    throw new HttpError(401, body.message || '登录已过期')
-  }
-
-  // 非 200: 业务错误
-  if (body.code !== 200) {
-    ElMessage.error(body.message)
-    throw new HttpError(body.code, body.message)
-  }
-
-  // 成功: 取出 data 返回
-  return body.data as T
 }
 
 export const http = {
   get: <T = unknown>(url: string, opts: Omit<RequestOptions, 'method' | 'body'> = {}) =>
-    request<T>(url, { ...opts, method: 'GET' }),
+    axiosInstance.request<T, T>({ url, ...toAxiosConfig(opts), method: 'GET' }),
   post: <T = unknown>(url: string, body?: unknown, opts: Omit<RequestOptions, 'method' | 'body'> = {}) =>
-    request<T>(url, { ...opts, method: 'POST', body }),
+    axiosInstance.request<T, T>({ url, ...toAxiosConfig(opts), method: 'POST', data: body }),
   put: <T = unknown>(url: string, body?: unknown, opts: Omit<RequestOptions, 'method' | 'body'> = {}) =>
-    request<T>(url, { ...opts, method: 'PUT', body }),
+    axiosInstance.request<T, T>({ url, ...toAxiosConfig(opts), method: 'PUT', data: body }),
   patch: <T = unknown>(url: string, body?: unknown, opts: Omit<RequestOptions, 'method' | 'body'> = {}) =>
-    request<T>(url, { ...opts, method: 'PATCH', body }),
+    axiosInstance.request<T, T>({ url, ...toAxiosConfig(opts), method: 'PATCH', data: body }),
   delete: <T = unknown>(url: string, opts: Omit<RequestOptions, 'method' | 'body'> = {}) =>
-    request<T>(url, { ...opts, method: 'DELETE' }),
+    axiosInstance.request<T, T>({ url, ...toAxiosConfig(opts), method: 'DELETE' }),
   /** 上传 multipart/form-data (含文件), 回调百分比, 返回解包后的 data */
   postForm: <T = unknown>(url: string, form: FormData, opts: PostFormOptions = {}) =>
-    requestForm<T>(url, form, opts),
+    axiosInstance.post<T, T>(url, form, {
+      headers: opts.headers,
+      params: opts.params,
+      onUploadProgress: (e) => {
+        if (e.total && e.total > 0) {
+          const p = Math.max(0, Math.min(100, Math.round((e.loaded / e.total) * 100)))
+          opts.onProgress?.(p)
+        }
+      },
+    }),
 }

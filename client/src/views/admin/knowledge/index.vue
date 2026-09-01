@@ -29,52 +29,13 @@ import {
   Link,
   Right,
 } from '@element-plus/icons-vue'
-import { http } from '@/utils/http'
+import { knowledgeApis } from '@/apis'
 import { useAuthStore } from '@/stores/auth'
+import type { Creator, KnowledgeRow, KnowledgeForm } from '@/types'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
-
-/* ===== 类型 ===== */
-interface Creator {
-  id: string
-  username: string
-  nickname: string | null
-  avatar: string | null
-}
-
-interface KnowledgeRow {
-  id: string
-  name: string
-  description: string | null
-  coverImage: string | null
-  embeddingModel: string
-  collection: string
-  chunkStrategy: string
-  chunkSize: number
-  chunkOverlap: number
-  documentCount: number
-  chunkCount: number
-  visibility: number
-  status: number
-  createdBy: string
-  creator: Creator
-  createdAt: string
-  updatedAt: string
-}
-
-interface KnowledgeForm {
-  id?: string
-  name: string
-  description: string
-  embeddingModel: string
-  chunkStrategy: string
-  chunkSize: number
-  chunkOverlap: number
-  visibility: number
-  status: number
-}
 
 /* ===== 状态 ===== */
 const loading = ref(false)
@@ -88,7 +49,7 @@ const submitting = ref(false)
 const defaultForm = (): KnowledgeForm => ({
   name: '',
   description: '',
-  embeddingModel: 'bge-m3',
+  embeddingModel: 'qwen3.7-text-embedding',
   chunkStrategy: 'recursive',
   chunkSize: 500,
   chunkOverlap: 50,
@@ -100,7 +61,7 @@ const form = reactive<KnowledgeForm>(defaultForm())
 
 /* ===== 选项 ===== */
 const modelOptions = [
-  { label: 'bge-m3(推荐,免费,多语言)', value: 'bge-m3' },
+  { label: 'qwen3.7-text-embedding(阿里云千问,1024维)', value: 'qwen3.7-text-embedding' },
 ]
 const strategyOptions = [
   { label: '递归切分(推荐)', value: 'recursive' },
@@ -118,7 +79,7 @@ const visibilityOptions = [
 async function loadList() {
   loading.value = true
   try {
-    list.value = await http.get<KnowledgeRow[]>('/api/knowledge')
+    list.value = await knowledgeApis.listKnowledge()
   } finally {
     loading.value = false
   }
@@ -155,10 +116,10 @@ async function handleSubmit() {
   submitting.value = true
   try {
     if (form.id) {
-      await http.put(`/api/knowledge/${form.id}`, form)
+      await knowledgeApis.updateKnowledge(form.id, form)
       ElMessage.success('知识库修改成功')
     } else {
-      await http.post('/api/knowledge', form)
+      await knowledgeApis.createKnowledge(form)
       ElMessage.success('知识库创建成功')
     }
     dialogVisible.value = false
@@ -177,7 +138,7 @@ async function handleDelete(row: KnowledgeRow) {
       '删除确认',
       { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
     )
-    await http.delete(`/api/knowledge/${row.id}`)
+    await knowledgeApis.deleteKnowledge(row.id)
     ElMessage.success('知识库删除成功')
     await loadList()
   } catch (e: any) {
@@ -280,7 +241,7 @@ onMounted(loadList)
           <el-icon><MagicStick /></el-icon>
         </div>
         <div class="kb-stat-body">
-          <span class="kb-stat-num">bge-m3</span>
+          <span class="kb-stat-num">qwen3.7</span>
           <span class="kb-stat-label">默认向量模型</span>
         </div>
       </div>

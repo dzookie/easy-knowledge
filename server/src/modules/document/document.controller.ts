@@ -21,9 +21,10 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
-import { AuthenticatedUser } from '@/common/decorators/current-user.decorator';
+import { AuthenticatedUser } from '@/common/types';
 import { DocumentService } from './document.service';
 import { DocumentListQueryDto } from './dto/document-list.dto';
+import { ChunkListQueryDto } from './dto/chunk-list.dto';
 
 @ApiTags('文档管理')
 @ApiBearerAuth()
@@ -66,6 +67,12 @@ export class DocumentController {
   @ApiOperation({ summary: '分页查询某知识库的文档列表' })
   list(@CurrentUser() user: AuthenticatedUser, @Query() query: DocumentListQueryDto) {
     return this.documentService.listDocuments(user, query);
+  }
+
+  @Get('chunks')
+  @ApiOperation({ summary: '分页查询切片列表(按知识库, 可选按文档过滤)' })
+  listChunks(@CurrentUser() user: AuthenticatedUser, @Query() query: ChunkListQueryDto) {
+    return this.documentService.listChunks(user, query);
   }
 
   @Delete(':id')
