@@ -280,8 +280,8 @@ function renderIcon(iconName: string | null) {
 .admin-content {
   flex: 1;
   padding: 32px;
-  max-width: 1280px;
   width: 100%;
+  min-width: 0;
 }
 
 /* 响应式 */

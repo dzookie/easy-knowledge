@@ -146,3 +146,20 @@ export interface RetrievalResponse {
   results: RetrievalResult[]
 }
 
+/** 知识问答引用来源 */
+export interface ChatSource {
+  fileName: string
+  chunkIndex: number
+  score: number
+  content: string
+}
+
+/** 知识问答消息 */
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  thinking?: string
+  sources?: ChatSource[]
+  prompt?: string
+}
+

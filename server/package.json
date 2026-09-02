@@ -23,6 +23,8 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@langchain/core": "^1.2.9",
+    "@langchain/openai": "^1.5.11",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.3.0",
     "@nestjs/core": "^10.0.0",

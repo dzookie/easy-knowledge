@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { QdrantModule } from './common/qdrant/qdrant.module';
 import { EmbeddingModule } from './common/embedding/embedding.module';
+import { LlmModule } from './common/llm/llm.module';
 import { StorageModule } from './common/storage/storage.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { MenuModule } from './modules/menu/menu.module';
@@ -11,6 +12,7 @@ import { UserModule } from './modules/user/user.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { DocumentModule } from './modules/document/document.module';
 import { RetrievalModule } from './modules/retrieval/retrieval.module';
+import { ChatModule } from './modules/chat/chat.module';
 
 @Module({
   imports: [
@@ -20,6 +22,7 @@ import { RetrievalModule } from './modules/retrieval/retrieval.module';
     PrismaModule,
     QdrantModule,
     EmbeddingModule,
+    LlmModule,
     StorageModule,
     // 业务模块
     AuthModule,
@@ -29,6 +32,7 @@ import { RetrievalModule } from './modules/retrieval/retrieval.module';
     KnowledgeModule,
     DocumentModule,
     RetrievalModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

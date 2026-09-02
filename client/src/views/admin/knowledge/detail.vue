@@ -201,7 +201,7 @@ onMounted(() => {
       </el-tab-pane>
 
       <el-tab-pane label="知识问答" name="qa">
-        <QaTab />
+        <QaTab :kb-id="kbId" />
       </el-tab-pane>
     </el-tabs>
   </div>
