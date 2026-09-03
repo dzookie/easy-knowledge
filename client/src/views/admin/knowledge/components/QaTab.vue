@@ -3,11 +3,12 @@
  * Tab4: 知识问答 — RAG 聊天界面
  * 左右布局: 左侧参数(Prompt配置/Top-K/阈值), 右侧聊天区(流式输出)
  */
-import { ref, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Promotion, ChatDotRound, Document, ArrowRight } from '@element-plus/icons-vue'
+import { Promotion, ChatDotRound, Document, ArrowRight, Key, Plus, Delete, CircleCheck, CircleClose, CopyDocument, View, Hide } from '@element-plus/icons-vue'
 import MarkdownIt from 'markdown-it'
-import { chatApis } from '@/apis'
+import { chatApis, serviceApis } from '@/apis'
+import type { ApiKeyRow } from '@/apis/service'
 import type { ChatMessage, ChatSource } from '@/types/knowledge'
 
 const md = new MarkdownIt({
@@ -207,6 +208,114 @@ function openDrawer(msg: ChatMessage) {
   drawerVisible.value = true
 }
 
+/* ============ 服务调用 (API Key 管理) ============ */
+const keyDialogVisible = ref(false)
+const keyListLoading = ref(false)
+const keyList = ref<ApiKeyRow[]>([])
+const keyCreateForm = ref({ name: '', dailyLimit: 100 })
+const keyCreating = ref(false)
+const keyCreateVisible = ref(false)
+const apiBaseUrl = ref(window.location.origin)
+/** 已切换为"显示"状态的 key id 集合, 默认全部隐藏 */
+const visibleKeyIds = ref<Set<string>>(new Set())
+
+async function openKeyDialog() {
+  keyDialogVisible.value = true
+  visibleKeyIds.value.clear()
+  await loadApiKeys()
+}
+
+/** 切换某个 key 的显示/隐藏 */
+function toggleKeyVisible(id: string) {
+  const set = new Set(visibleKeyIds.value)
+  if (set.has(id)) set.delete(id)
+  else set.add(id)
+  visibleKeyIds.value = set
+}
+
+/** 根据显示状态返回展示文本 */
+function displayKey(item: ApiKeyRow): string {
+  return visibleKeyIds.value.has(item.id) ? item.key : 'sk-********************************'
+}
+
+/** curl 调用示例文本 */
+const curlExample = computed(() => [
+  `curl -X POST ${apiBaseUrl.value}/api/service/chat \\`,
+  `  -H "X-API-Key: sk-xxxx" \\`,
+  `  -H "Content-Type: application/json" \\`,
+  `  -d '{"query": "你的问题"}'`,
+].join('\n'))
+
+async function copyCurl() {
+  try {
+    await navigator.clipboard.writeText(curlExample.value)
+    ElMessage.success('已复制 curl 命令')
+  } catch {
+    ElMessage.error('复制失败, 请手动选择文本')
+  }
+}
+
+async function loadApiKeys() {
+  keyListLoading.value = true
+  try {
+    keyList.value = await serviceApis.listApiKeys(props.kbId)
+  } catch (err: any) {
+    ElMessage.error(err?.message || '加载 API Key 列表失败')
+  } finally {
+    keyListLoading.value = false
+  }
+}
+
+async function handleCreateKey() {
+  if (!keyCreateForm.value.name.trim()) {
+    ElMessage.warning('请输入用途描述')
+    return
+  }
+  keyCreating.value = true
+  try {
+    await serviceApis.createApiKey({
+      name: keyCreateForm.value.name.trim(),
+      kbId: props.kbId,
+      dailyLimit: keyCreateForm.value.dailyLimit,
+    })
+    ElMessage.success('API Key 创建成功')
+    keyCreateForm.value = { name: '', dailyLimit: 100 }
+    keyCreateVisible.value = false
+    await loadApiKeys()
+  } catch (err: any) {
+    ElMessage.error(err?.message || '创建失败')
+  } finally {
+    keyCreating.value = false
+  }
+}
+
+async function handleDeleteKey(id: string) {
+  try {
+    await serviceApis.deleteApiKey(id)
+    ElMessage.success('删除成功')
+    await loadApiKeys()
+  } catch (err: any) {
+    ElMessage.error(err?.message || '删除失败')
+  }
+}
+
+async function handleToggleKey(id: string) {
+  try {
+    await serviceApis.toggleApiKey(id)
+    await loadApiKeys()
+  } catch (err: any) {
+    ElMessage.error(err?.message || '操作失败')
+  }
+}
+
+function copyKey(key: string) {
+  navigator.clipboard.writeText(key).then(() => {
+    ElMessage.success('已复制到剪贴板')
+  }).catch(() => {
+    ElMessage.warning('复制失败, 请手动复制')
+  })
+}
+
 /* ============ 卸载清理 ============ */
 onBeforeUnmount(() => {
   messages.value = []
@@ -251,8 +360,8 @@ onBeforeUnmount(() => {
 
       <div class="kb-qa-divider" />
 
-      <el-button type="info" plain class="kb-qa-left-btn">
-        <el-icon><Promotion /></el-icon>
+      <el-button type="info" plain class="kb-qa-left-btn" @click="openKeyDialog">
+        <el-icon><Key /></el-icon>
         创建服务调用
       </el-button>
     </div>
@@ -365,6 +474,93 @@ onBeforeUnmount(() => {
         </div>
       </template>
     </el-drawer>
+
+    <!-- API Key 管理弹窗 -->
+    <el-dialog v-model="keyDialogVisible" title="服务调用" width="560px">
+      <div class="kb-qa-key-dialog">
+        <!-- 说明 -->
+        <div class="kb-qa-key-info">
+          <p>外部项目通过 API Key 调用知识库问答服务：</p>
+          <div class="kb-qa-key-curl-wrap">
+            <pre class="kb-qa-key-curl">{{ curlExample }}</pre>
+            <el-tooltip content="复制 curl" placement="top">
+              <el-button
+                class="kb-qa-key-curl-copy"
+                text
+                size="small"
+                :icon="CopyDocument"
+                @click="copyCurl"
+              />
+            </el-tooltip>
+          </div>
+        </div>
+
+        <!-- 创建按钮 -->
+        <div class="kb-qa-key-toolbar">
+          <el-button type="primary" size="small" :icon="Plus" @click="keyCreateVisible = !keyCreateVisible">新建 API Key</el-button>
+        </div>
+
+        <!-- 创建表单 -->
+        <div v-if="keyCreateVisible" class="kb-qa-key-create">
+          <el-input v-model="keyCreateForm.name" placeholder="用途描述, 如: 客服系统接入" size="small" />
+          <div class="kb-qa-key-create-row">
+            <span class="kb-qa-key-create-label">每日调用上限</span>
+            <el-input-number v-model="keyCreateForm.dailyLimit" :min="1" :max="10000" size="small" />
+          </div>
+          <div class="kb-qa-key-create-actions">
+            <el-button size="small" @click="keyCreateVisible = false">取消</el-button>
+            <el-button type="primary" size="small" :loading="keyCreating" @click="handleCreateKey">创建</el-button>
+          </div>
+        </div>
+
+        <!-- Key 列表 -->
+        <div v-loading="keyListLoading" class="kb-qa-key-list">
+          <div v-if="keyList.length === 0 && !keyListLoading" class="kb-qa-key-empty">
+            暂无 API Key
+          </div>
+          <div v-for="item in keyList" :key="item.id" class="kb-qa-key-item">
+            <div class="kb-qa-key-item-head">
+              <el-icon class="kb-qa-key-item-icon"><Key /></el-icon>
+              <span class="kb-qa-key-item-name">{{ item.name }}</span>
+              <el-tag size="small" :type="item.status === 1 ? 'success' : 'danger'" effect="plain">
+                {{ item.status === 1 ? '启用' : '禁用' }}
+              </el-tag>
+            </div>
+            <div class="kb-qa-key-item-key">
+              <code>{{ displayKey(item) }}</code>
+              <el-tooltip :content="visibleKeyIds.has(item.id) ? '隐藏' : '显示'" placement="top">
+                <el-button
+                  text
+                  size="small"
+                  :icon="visibleKeyIds.has(item.id) ? Hide : View"
+                  @click="toggleKeyVisible(item.id)"
+                />
+              </el-tooltip>
+              <el-tooltip content="复制" placement="top">
+                <el-button
+                  text
+                  size="small"
+                  :icon="CopyDocument"
+                  :disabled="!visibleKeyIds.has(item.id)"
+                  @click="copyKey(item.key)"
+                />
+              </el-tooltip>
+            </div>
+            <div class="kb-qa-key-item-meta">
+              <span>知识库: {{ item.kbName }}</span>
+              <span>调用: {{ item.callCount }} / {{ item.dailyLimit }}次/日</span>
+              <span>创建: {{ new Date(item.createdAt).toLocaleDateString() }}</span>
+            </div>
+            <div class="kb-qa-key-item-actions">
+              <el-button text size="small" :type="item.status === 1 ? 'warning' : 'success'" @click="handleToggleKey(item.id)">
+                {{ item.status === 1 ? '禁用' : '启用' }}
+              </el-button>
+              <el-button text size="small" type="danger" :icon="Delete" @click="handleDeleteKey(item.id)">删除</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -478,4 +674,29 @@ onBeforeUnmount(() => {
 .kb-qa-msg-md :deep(th), .kb-qa-msg-md :deep(td) { border: 1px solid var(--border-100); padding: 6px 10px; text-align: left; }
 .kb-qa-msg-md :deep(th) { background: rgba(0,0,0,0.02); font-weight: 600; }
 .kb-qa-msg-md :deep(hr) { border: none; border-top: 1px solid var(--border-100); margin: 12px 0; }
+
+/* API Key 管理弹窗 */
+.kb-qa-key-dialog { display: flex; flex-direction: column; gap: 12px; }
+.kb-qa-key-info p { margin: 0 0 6px; font-size: 13px; color: var(--muted-foreground); }
+.kb-qa-key-curl-wrap { position: relative; }
+.kb-qa-key-curl { font-size: 11px; line-height: 1.6; color: var(--foreground); background: rgba(0,0,0,0.03); border: 1px solid var(--border-100); border-radius: var(--radius-sm); padding: 10px 12px; font-family: var(--font-mono, 'SF Mono', 'Consolas', monospace); white-space: pre-wrap; word-break: break-word; margin: 0; }
+.kb-qa-key-curl-copy { position: absolute; top: 4px; right: 4px; opacity: 0; transition: opacity .15s ease; }
+.kb-qa-key-curl-wrap:hover .kb-qa-key-curl-copy { opacity: 1; }
+.kb-qa-key-toolbar { display: flex; justify-content: flex-end; }
+.kb-qa-key-create { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: rgba(0,0,0,0.02); border: 1px solid var(--border-100); border-radius: var(--radius-sm); }
+.kb-qa-key-create-row { display: flex; align-items: center; gap: 8px; }
+.kb-qa-key-create-label { font-size: 13px; color: var(--muted-foreground); white-space: nowrap; }
+.kb-qa-key-create-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.kb-qa-key-list { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.kb-qa-key-list::-webkit-scrollbar { display: none; }
+.kb-qa-key-empty { text-align: center; padding: 24px; color: var(--muted-foreground); font-size: 13px; }
+.kb-qa-key-item { padding: 10px 12px; border: 1px solid var(--border-100); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 6px; }
+.kb-qa-key-item-head { display: flex; align-items: center; gap: 6px; }
+.kb-qa-key-item-icon { color: var(--muted-foreground); font-size: 14px; }
+.kb-qa-key-item-name { font-size: 13px; font-weight: 600; color: var(--foreground); flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.kb-qa-key-item-key { display: flex; align-items: center; gap: 2px; }
+.kb-qa-key-item-key code { flex: 1; font-size: 12px; font-family: var(--font-mono, 'SF Mono', 'Consolas', monospace); color: var(--primary); background: rgba(0,0,0,0.03); padding: 2px 6px; border-radius: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; letter-spacing: 0.5px; }
+.kb-qa-key-item-key :deep(.el-button.is-text) { padding: 4px; height: auto; }
+.kb-qa-key-item-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--muted-foreground); }
+.kb-qa-key-item-actions { display: flex; justify-content: flex-end; gap: 4px; }
 </style>

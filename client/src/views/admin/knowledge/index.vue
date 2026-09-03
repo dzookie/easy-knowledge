@@ -23,11 +23,9 @@ import {
   Collection,
   Document,
   Grid,
-  MagicStick,
   User,
   Warning,
   Link,
-  Right,
 } from '@element-plus/icons-vue'
 import { knowledgeApis } from '@/apis'
 import { useAuthStore } from '@/stores/auth'
@@ -236,15 +234,6 @@ onMounted(loadList)
           <span class="kb-stat-label">切片总数</span>
         </div>
       </div>
-      <div class="kb-stat-card">
-        <div class="kb-stat-icon kb-stat-icon-4">
-          <el-icon><MagicStick /></el-icon>
-        </div>
-        <div class="kb-stat-body">
-          <span class="kb-stat-num">qwen3.7</span>
-          <span class="kb-stat-label">默认向量模型</span>
-        </div>
-      </div>
     </div>
 
     <!-- 空状态 -->
@@ -372,13 +361,6 @@ onMounted(loadList)
               text
               type="primary"
               size="small"
-              :icon="Right"
-              @click.stop="goDetail(kb)"
-            >进入</el-button>
-            <el-button
-              text
-              type="primary"
-              size="small"
               :icon="Edit"
               @click.stop="openEdit(kb)"
             >编辑</el-button>
@@ -389,15 +371,6 @@ onMounted(loadList)
               :icon="Delete"
               @click.stop="handleDelete(kb)"
             >删除</el-button>
-          </div>
-          <div class="kb-actions" v-else>
-            <el-button
-              text
-              type="primary"
-              size="small"
-              :icon="Right"
-              @click.stop="goDetail(kb)"
-            >进入</el-button>
           </div>
         </div>
       </div>
@@ -574,7 +547,6 @@ onMounted(loadList)
 .kb-stat-icon-1 { background: var(--brand-500); }
 .kb-stat-icon-2 { background: var(--success-500, var(--success)); }
 .kb-stat-icon-3 { background: #7C5CFF; }
-.kb-stat-icon-4 { background: #1F8FFF; }
 .kb-stat-body {
   display: flex;
   flex-direction: column;
@@ -622,7 +594,8 @@ onMounted(loadList)
 /* ============ 卡片网格 ============ */
 .kb-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  /* minmax 最小值调大, 限制宽屏下列数, 避免卡片过窄拥挤 */
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 16px;
 }
 .kb-card {
@@ -784,6 +757,7 @@ onMounted(loadList)
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
 }
 .kb-creator-avatar {
   width: 28px;
@@ -806,6 +780,7 @@ onMounted(loadList)
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  overflow: hidden;
 }
 .kb-creator-name {
   font-size: 12px;
@@ -813,10 +788,14 @@ onMounted(loadList)
   color: var(--foreground);
   display: inline-flex;
   align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .kb-creator-date {
   font-size: 11px;
   color: var(--muted-foreground);
+  white-space: nowrap;
 }
 .kb-actions {
   display: flex;

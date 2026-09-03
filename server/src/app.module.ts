@@ -13,6 +13,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { DocumentModule } from './modules/document/document.module';
 import { RetrievalModule } from './modules/retrieval/retrieval.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { ServiceModule } from './modules/service/service.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ChatModule } from './modules/chat/chat.module';
     DocumentModule,
     RetrievalModule,
     ChatModule,
+    ServiceModule,
   ],
 })
 export class AppModule {}

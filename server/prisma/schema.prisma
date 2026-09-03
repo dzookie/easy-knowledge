@@ -33,6 +33,7 @@ model User {
 
   knowledgeBases KnowledgeBase[]
   uploadedDocuments Document[] @relation("DocumentUploader")
+  apiKeys       ApiKey[]
 
   @@index([roleId])
   @@index([status])
@@ -132,6 +133,7 @@ model KnowledgeBase {
 
   documents     Document[]
   chunks        DocumentChunk[]
+  apiKeys       ApiKey[]
 
   @@index([createdBy])
   @@index([status])
@@ -231,4 +233,37 @@ model DocumentChunk {
   @@index([indexed])
   @@index([documentId, chunkIndex])
   @@map("document_chunk")
+}
+
+/// API Key — 对外服务调用凭证
+/// 外部项目通过 X-API-Key 请求头调用 /api/service/chat 问答接口
+model ApiKey {
+  id          BigInt    @id @default(autoincrement())
+  /// API Key 值 (sk-xxx 格式, 全局唯一)
+  key         String    @unique @db.VarChar(128)
+  /// 用途描述, 如 "客服系统接入"
+  name        String    @db.VarChar(100)
+  /// 绑定的知识库 ID
+  kbId        BigInt    @map("kb_id")
+  kb          KnowledgeBase @relation(fields: [kbId], references: [id])
+  /// 创建者 ID
+  userId      BigInt    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id])
+  /// 1=启用 0=禁用
+  status      Int       @default(1) @db.TinyInt
+  /// 累计调用次数
+  callCount   Int       @default(0) @map("call_count") @db.UnsignedInt
+  /// 累计 token 消耗 (粗略统计)
+  tokenCount  Int       @default(0) @map("token_count") @db.UnsignedInt
+  /// 每日调用上限
+  dailyLimit  Int       @default(100) @map("daily_limit") @db.UnsignedInt
+  /// 过期时间 (null=永不过期)
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([kbId])
+  @@index([userId])
+  @@index([status])
+  @@map("api_key")
 }
