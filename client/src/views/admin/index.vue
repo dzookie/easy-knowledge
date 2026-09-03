@@ -79,7 +79,7 @@ function renderIcon(iconName: string | null) {
     <!-- ============ 侧栏 ============ -->
     <aside class="admin-sidebar">
       <div class="admin-brand">
-        <span class="admin-brand-mark">E</span>
+        <img src="/logo.svg" alt="Easy-Knowledge" class="admin-brand-logo" />
         <span class="admin-brand-text">Easy-Knowledge</span>
       </div>
 
@@ -184,16 +184,11 @@ function renderIcon(iconName: string | null) {
   margin-bottom: 8px;
   border-bottom: 1px solid var(--border-100);
 }
-.admin-brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  border-radius: var(--radius-sm);
-  font: 600 13px var(--font-sans);
+.admin-brand-logo {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: block;
 }
 .admin-brand-text {
   font: 600 13px/1.2 var(--font-sans);

@@ -67,7 +67,7 @@ async function submit() {
     <section class="auth-brand">
       <div class="auth-brand-inner">
         <div class="auth-logo">
-          <span class="auth-logo-mark">E</span>
+          <img src="/logo.svg" alt="Easy-Knowledge" class="auth-logo-mark" />
           <span class="auth-logo-text">Easy-Knowledge</span>
         </div>
         <h1 class="auth-hero-title">
@@ -213,15 +213,10 @@ async function submit() {
   margin-bottom: 64px;
 }
 .auth-logo-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   width: 36px;
   height: 36px;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  border-radius: var(--radius-sm);
-  font: 600 18px var(--font-sans);
+  display: block;
+  flex-shrink: 0;
 }
 .auth-logo-text {
   font: 600 16px/1.2 var(--font-sans);
