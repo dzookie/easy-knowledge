@@ -56,6 +56,9 @@ export class LlmService implements OnModuleInit {
 
   /**
    * 同步对话 — 等待完整结果返回
+   *
+   * 注意: chatModel 实例配置了 streaming: true, 但同步 invoke 在某些 LangChain
+   * 版本下会卡住不返回。这里在调用时显式传 { streaming: false } 覆盖实例默认值。
    */
   async chat(
     systemPrompt: string,
@@ -72,7 +75,7 @@ export class LlmService implements OnModuleInit {
 
     const parser = new StringOutputParser();
     const chain = this.chatModel.pipe(parser);
-    return await chain.invoke(langchainMessages);
+    return await chain.invoke(langchainMessages, { streaming: false });
   }
 
   /**
