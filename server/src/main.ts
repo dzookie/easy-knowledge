@@ -20,7 +20,7 @@ async function bootstrap() {
     origin: clientOrigin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
   });
 
   // ===== 全局 ValidationPipe =====
@@ -45,7 +45,7 @@ async function bootstrap() {
   // ===== Swagger 文档 =====
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Easy-Knowledge API')
-    .setDescription('类火山方舟知识库系统 - 后端接口文档')
+    .setDescription('EK知识库系统 - 后端接口文档')
     .setVersion('0.1.0')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },

@@ -7,9 +7,8 @@ import {
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '@/common/prisma/prisma.service';
-import { QdrantService } from '@/common/qdrant/qdrant.service';
-import { EmbeddingService } from '@/common/embedding/embedding.service';
 import { LlmService } from '@/common/llm/llm.service';
+import { RagService } from '@/common/rag/rag.service';
 import { AuthenticatedUser } from '@/common/types';
 import { CreateApiKeyDto } from './dto/service.dto';
 
@@ -17,25 +16,16 @@ import { CreateApiKeyDto } from './dto/service.dto';
  * ServiceService — 对外服务调用
  *
  * 1. API Key 的 CRUD 管理 (JWT 鉴权)
- * 2. 对外问答接口 (API Key 鉴权) — RAG 检索 → LLM 同步生成
+ * 2. 对外问答接口 (API Key 鉴权) — 委托 RagService 检索 + 组装 prompt，
+ *    同步调用 LLM 生成回答，并更新 API Key 调用统计
  */
 @Injectable()
 export class ServiceService {
   private readonly logger = new Logger(ServiceService.name);
 
-  /** 默认系统提示词 (对外接口不允许自定义时使用) */
-  private static readonly DEFAULT_SYSTEM_PROMPT = `你是一个专业的知识库问答助手。请根据以下参考资料回答用户的问题。
-
-要求：
-1. 回答必须基于参考资料，不要编造信息
-2. 如果参考资料不足以回答问题，请坦诚说明
-3. 回答要清晰、准确、有条理
-4. 在回答中引用相关资料时，使用 [1] [2] 等标注`;
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly qdrant: QdrantService,
-    private readonly embedding: EmbeddingService,
+    private readonly rag: RagService,
     private readonly llm: LlmService,
   ) {}
 
@@ -152,7 +142,10 @@ export class ServiceService {
   /**
    * 对外问答 — 同步返回完整结果 (非流式)
    *
-   * @param apiKeyRecord 从 ApiKeyGuard 挂载到 req.apiKey 的记录
+   * RAG 检索与 Prompt 组装逻辑已委托 RagService，与后台 ChatService
+   * 共享同一份实现；本方法只负责同步调用 LLM 与更新 API Key 调用统计。
+   *
+   * @param apiKeyRecord 从 ApiKeyGuard 挂载到 req.apiKey 的记录(含 kb 关联)
    * @param query 用户问题
    * @param topK 检索数量
    * @param scoreThreshold 相似度阈值
@@ -170,48 +163,16 @@ export class ServiceService {
       throw new BadRequestException('知识库向量集合尚未初始化');
     }
 
-    // 1. 检查 Qdrant 集合
-    const exists = await this.qdrant.collectionExists(kb.collection);
-    if (!exists) {
-      throw new BadRequestException('知识库向量集合不存在, 可能尚未上传文档');
-    }
+    // 1. RAG 检索（委托 RagService，内部已校验集合存在性）
+    const sources = await this.rag.retrieve(kb.collection, query, topK, scoreThreshold);
 
-    // 2. 向量化 query
-    const vectors = await this.embedding.embed([query]);
-    if (!vectors[0] || vectors[0].length === 0) {
-      throw new BadRequestException('查询向量化失败');
-    }
+    // 2. 组装系统提示词
+    const fullPrompt = this.rag.buildSystemPrompt(systemPrompt, sources);
 
-    // 3. Qdrant 检索
-    const client = this.qdrant.getClient();
-    const searchResult = await client.query(kb.collection, {
-      query: vectors[0],
-      limit: topK,
-      with_payload: true,
-      with_vector: false,
-      ...(scoreThreshold > 0 ? { score_threshold: scoreThreshold } : {}),
-    });
-
-    const points = (searchResult as any)?.points ?? [];
-    const sources = points.map((point: any) => ({
-      vectorId: String(point.id),
-      score: Math.round((point.score ?? 0) * 1000) / 1000,
-      content: point.payload?.content ?? '',
-      chunkIndex: point.payload?.chunkIndex ?? 0,
-      fileName: point.payload?.fileName ?? '',
-    }));
-
-    // 4. 构建系统提示词
-    const basePrompt = systemPrompt?.trim() || ServiceService.DEFAULT_SYSTEM_PROMPT;
-    const context = sources.length > 0
-      ? sources.map((s: any, i: number) => `[${i + 1}] 来源: ${s.fileName}\n内容: ${s.content}`).join('\n\n')
-      : '注意：未检索到相关参考资料。';
-    const fullPrompt = `${basePrompt}\n\n参考资料:\n\n${context}`;
-
-    // 5. 调用 LLM 同步生成
+    // 3. 调用 LLM 同步生成
     const answer = await this.llm.chat(fullPrompt, [{ role: 'user', content: query }]);
 
-    // 6. 更新调用统计
+    // 4. 更新调用统计
     await this.prisma.apiKey.update({
       where: { id: apiKeyRecord.id },
       data: {
@@ -224,11 +185,59 @@ export class ServiceService {
 
     return {
       answer,
-      sources: sources.map((s: any) => ({
+      sources: sources.map((s) => ({
         fileName: s.fileName,
         score: s.score,
         content: s.content.slice(0, 200) + (s.content.length > 200 ? '...' : ''),
       })),
     };
+  }
+
+  /**
+   * 对外问答 — 流式返回 (SSE)
+   *
+   * yield 顺序与后台 ChatService.chat 对齐:
+   *   sources → prompt → thinking(可选) → content → done
+   *
+   * 检索 + Prompt 组装 + 流式生成核心流程已委托 RagService.ragChat(),
+   * 与后台 ChatService 共享同一份实现；本方法只额外负责:
+   *   - 集合初始化校验
+   *   - 流结束后更新 API Key 调用统计 (按 content 字符数累计 token)
+   */
+  async *chatStream(
+    apiKeyRecord: any,
+    query: string,
+    topK = 5,
+    scoreThreshold = 0,
+    systemPrompt?: string,
+  ): AsyncGenerator<{ event: 'sources' | 'prompt' | 'thinking' | 'content'; data: string }, void, unknown> {
+    const kb = apiKeyRecord.kb;
+    if (!kb?.collection || kb.collection === 'pending') {
+      throw new BadRequestException('知识库向量集合尚未初始化');
+    }
+
+    // 委托 RagService 完成检索 + 组装 + 流式生成, 同时累计 content 字符数
+    let answerLength = 0;
+    for await (const chunk of this.rag.ragChat({
+      collection: kb.collection,
+      query,
+      topK,
+      scoreThreshold,
+      systemPrompt,
+    })) {
+      if (chunk.event === 'content') answerLength += chunk.data.length;
+      yield chunk;
+    }
+
+    // 更新调用统计 (流结束后统一更新)
+    await this.prisma.apiKey.update({
+      where: { id: apiKeyRecord.id },
+      data: {
+        callCount: { increment: 1 },
+        tokenCount: { increment: answerLength },
+      },
+    });
+
+    this.logger.log(`对外问答(流式)完成: keyId=${apiKeyRecord.id}, query="${query.slice(0, 50)}..."`);
   }
 }

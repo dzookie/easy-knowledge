@@ -5,6 +5,7 @@ import { QdrantModule } from './common/qdrant/qdrant.module';
 import { EmbeddingModule } from './common/embedding/embedding.module';
 import { LlmModule } from './common/llm/llm.module';
 import { StorageModule } from './common/storage/storage.module';
+import { RagModule } from './common/rag/rag.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { MenuModule } from './modules/menu/menu.module';
 import { RoleModule } from './modules/role/role.module';
@@ -25,6 +26,7 @@ import { ServiceModule } from './modules/service/service.module';
     EmbeddingModule,
     LlmModule,
     StorageModule,
+    RagModule,
     // 业务模块
     AuthModule,
     MenuModule,

@@ -36,6 +36,10 @@ server/generated/
 uploads/
 data/
 
+# ============ 本地文档与测试项目 (不上传 git) ============
+docs/
+test/
+
 # ============ 秘钥 / 配置 ============
 *.pem
 *.key

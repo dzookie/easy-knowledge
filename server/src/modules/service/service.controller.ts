@@ -9,8 +9,11 @@ import {
   Query,
   UseGuards,
   Req,
+  Res,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags, ApiHeader } from '@nestjs/swagger';
+import { Response } from 'express';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { ApiKeyGuard } from '@/common/guards/api-key.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -84,11 +87,42 @@ export class ServiceController {
   @UseGuards(ApiKeyGuard)
   @ApiHeader({ name: 'X-API-Key', description: 'API Key' })
   @Post('service/chat')
-  @ApiOperation({ summary: '对外知识问答 (API Key 鉴权)' })
+  @ApiOperation({ summary: '对外知识问答 (API Key 鉴权, 支持 stream)' })
   async chat(
     @Req() req: any,
     @Body() dto: ServiceChatDto,
+    @Res() res: Response,
   ) {
+    // 流式: SSE
+    if (dto.stream) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.status(HttpStatus.OK);
+
+      try {
+        const stream = this.serviceService.chatStream(
+          req.apiKey,
+          dto.query,
+          dto.topK,
+          dto.scoreThreshold,
+          dto.systemPrompt,
+        );
+        for await (const chunk of stream) {
+          res.write(`data: ${JSON.stringify({ event: chunk.event, data: chunk.data })}\n\n`);
+        }
+        res.write(`data: ${JSON.stringify({ event: 'done', data: '' })}\n\n`);
+      } catch (err: any) {
+        const msg = err?.message || '对外问答失败';
+        res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+      } finally {
+        res.end();
+      }
+      return;
+    }
+
+    // 同步: 完整 JSON
     return this.serviceService.chat(
       req.apiKey,
       dto.query,

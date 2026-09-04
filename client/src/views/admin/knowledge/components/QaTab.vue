@@ -246,10 +246,19 @@ const curlExample = computed(() => [
   `  -d '{"query": "你的问题"}'`,
 ].join('\n'))
 
-async function copyCurl() {
+/** curl 流式调用示例 */
+const curlStreamExample = computed(() => [
+  `curl -X POST ${apiBaseUrl.value}/api/service/chat \\`,
+  `  -H "X-API-Key: sk-xxxx" \\`,
+  `  -H "Content-Type: application/json" \\`,
+  `  -H "Accept: text/event-stream" \\`,
+  `  -d '{"query": "你的问题", "stream": true}'`,
+].join('\n'))
+
+async function copyText(text: string, label = 'curl') {
   try {
-    await navigator.clipboard.writeText(curlExample.value)
-    ElMessage.success('已复制 curl 命令')
+    await navigator.clipboard.writeText(text)
+    ElMessage.success(`已复制 ${label} 命令`)
   } catch {
     ElMessage.error('复制失败, 请手动选择文本')
   }
@@ -482,6 +491,7 @@ onBeforeUnmount(() => {
         <div class="kb-qa-key-info">
           <p>外部项目通过 API Key 调用知识库问答服务：</p>
           <div class="kb-qa-key-curl-wrap">
+            <div class="kb-qa-key-curl-label">同步模式 (完整返回 JSON)</div>
             <pre class="kb-qa-key-curl">{{ curlExample }}</pre>
             <el-tooltip content="复制 curl" placement="top">
               <el-button
@@ -489,7 +499,20 @@ onBeforeUnmount(() => {
                 text
                 size="small"
                 :icon="CopyDocument"
-                @click="copyCurl"
+                @click="copyText(curlExample, '同步 curl')"
+              />
+            </el-tooltip>
+          </div>
+          <div class="kb-qa-key-curl-wrap">
+            <div class="kb-qa-key-curl-label">流式模式 (SSE 逐字输出)</div>
+            <pre class="kb-qa-key-curl">{{ curlStreamExample }}</pre>
+            <el-tooltip content="复制 curl" placement="top">
+              <el-button
+                class="kb-qa-key-curl-copy"
+                text
+                size="small"
+                :icon="CopyDocument"
+                @click="copyText(curlStreamExample, '流式 curl')"
               />
             </el-tooltip>
           </div>
@@ -678,7 +701,8 @@ onBeforeUnmount(() => {
 /* API Key 管理弹窗 */
 .kb-qa-key-dialog { display: flex; flex-direction: column; gap: 12px; }
 .kb-qa-key-info p { margin: 0 0 6px; font-size: 13px; color: var(--muted-foreground); }
-.kb-qa-key-curl-wrap { position: relative; }
+.kb-qa-key-curl-wrap { position: relative; margin-top: 6px; }
+.kb-qa-key-curl-label { font-size: 11px; color: var(--muted-foreground); margin-bottom: 2px; font-weight: 500; }
 .kb-qa-key-curl { font-size: 11px; line-height: 1.6; color: var(--foreground); background: rgba(0,0,0,0.03); border: 1px solid var(--border-100); border-radius: var(--radius-sm); padding: 10px 12px; font-family: var(--font-mono, 'SF Mono', 'Consolas', monospace); white-space: pre-wrap; word-break: break-word; margin: 0; }
 .kb-qa-key-curl-copy { position: absolute; top: 4px; right: 4px; opacity: 0; transition: opacity .15s ease; }
 .kb-qa-key-curl-wrap:hover .kb-qa-key-curl-copy { opacity: 1; }

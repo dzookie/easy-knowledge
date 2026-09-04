@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsString, IsNotEmpty, IsInt, IsOptional, Min, Max, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsInt, IsOptional, Min, Max, MaxLength, IsBoolean } from 'class-validator';
 
 /** 创建 API Key */
 export class CreateApiKeyDto {
@@ -52,4 +52,9 @@ export class ServiceChatDto {
   @IsString()
   @MaxLength(2000)
   systemPrompt?: string;
+
+  @ApiPropertyOptional({ description: '是否流式返回 (SSE)', default: false })
+  @IsOptional()
+  @IsBoolean()
+  stream?: boolean;
 }
