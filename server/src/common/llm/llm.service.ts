@@ -25,7 +25,10 @@ export class LlmService implements OnModuleInit {
   private model: string;
   private temperature: number;
   private maxTokens: number;
+  // 流式模型实例 (供 chatStream 使用)
   private chatModel: ChatOpenAI;
+  // 同步模型实例 (供 chat 使用, 不开启 streaming 避免 invoke 卡死)
+  private chatModelSync: ChatOpenAI;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -40,14 +43,21 @@ export class LlmService implements OnModuleInit {
       this.logger.warn('⚠️  DEEPSEEK_API_KEY 未配置, LLM 调用会失败.');
     }
 
-    this.chatModel = new ChatOpenAI({
+    const baseOpts = {
       apiKey: this.apiKey,
       model: this.model,
       temperature: this.temperature,
       maxTokens: this.maxTokens,
-      streaming: true,
       configuration: { baseURL: `${this.baseUrl}/v1` },
-    });
+    };
+
+    // 流式实例: streaming: true, 供 chatStream() 使用
+    this.chatModel = new ChatOpenAI({ ...baseOpts, streaming: true });
+
+    // 同步实例: 不开启 streaming, 供 chat() 的 invoke 使用
+    // (LangChain.js 在 streaming: true 时 invoke 会进入流式内部逻辑,
+    //  某些版本下回调永不 resolve 导致同步调用卡死)
+    this.chatModelSync = new ChatOpenAI(baseOpts);
 
     this.logger.log(
       `LLM 已配置: model=${this.model}, temperature=${this.temperature}, maxTokens=${this.maxTokens}, endpoint=${this.baseUrl}`,
@@ -56,9 +66,6 @@ export class LlmService implements OnModuleInit {
 
   /**
    * 同步对话 — 等待完整结果返回
-   *
-   * 注意: chatModel 实例配置了 streaming: true, 但同步 invoke 在某些 LangChain
-   * 版本下会卡住不返回。这里在调用时显式传 { streaming: false } 覆盖实例默认值。
    */
   async chat(
     systemPrompt: string,
@@ -74,8 +81,8 @@ export class LlmService implements OnModuleInit {
     }
 
     const parser = new StringOutputParser();
-    const chain = this.chatModel.pipe(parser);
-    return await chain.invoke(langchainMessages, { streaming: false });
+    const chain = this.chatModelSync.pipe(parser);
+    return await chain.invoke(langchainMessages);
   }
 
   /**

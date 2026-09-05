@@ -63,7 +63,7 @@ const modelOptions = [
 ]
 const strategyOptions = [
   { label: '递归切分(推荐)', value: 'recursive' },
-  { label: '语义切分(慢但精准)', value: 'semantic' },
+  { label: '语义切分(按标题/段落, 更精准)', value: 'semantic' },
   { label: '固定长度', value: 'fixed' },
 ]
 const visibilityOptions = [

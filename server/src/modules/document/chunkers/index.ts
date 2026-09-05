@@ -1,6 +1,7 @@
 import { ChunkItem, ParsedResult } from '../parsers/types';
 import { splitRecursive } from './recursive.chunker';
 import { splitFixed } from './fixed.chunker';
+import { splitSemantic } from './semantic.chunker';
 
 export type ChunkStrategy = 'recursive' | 'fixed' | 'semantic';
 
@@ -13,7 +14,10 @@ export interface ChunkOptions {
 /**
  * 切片器入口
  *
- * semantic v1 fallback 成 recursive (前面方案里定好的)
+ * 三种策略:
+ *  - recursive: 递归字符切分 (按 \n\n → \n → 句末标点 → 逗号 → 硬切)
+ *  - semantic:  语义切分 (按 Markdown 标题边界 + 段落贪心合并 + 标题路径注入)
+ *  - fixed:     固定长度切分 (按字符数硬切)
  */
 export function createChunks(parsed: ParsedResult, opts: ChunkOptions): ChunkItem[] {
   const strategy: ChunkStrategy =
@@ -30,8 +34,7 @@ export function createChunks(parsed: ParsedResult, opts: ChunkOptions): ChunkIte
     case 'fixed':
       return splitFixed(parsed.text, parsed.segments, safeOpts);
     case 'semantic':
-      // v1 fallback: recursive
-      return splitRecursive(parsed.text, parsed.segments, safeOpts);
+      return splitSemantic(parsed.text, parsed.segments, safeOpts);
     case 'recursive':
     default:
       return splitRecursive(parsed.text, parsed.segments, safeOpts);
