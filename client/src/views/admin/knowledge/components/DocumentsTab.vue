@@ -278,6 +278,28 @@ function dismissUploadTask(uid: number | string) {
   uploadQueue.value = uploadQueue.value.filter((x) => x.uid !== uid)
 }
 
+/* 下载文档 */
+const downloadingId = ref<string | null>(null)
+async function handleDownloadDoc(row: DocumentRow) {
+  if (row._localTemp) return
+  downloadingId.value = row.id
+  try {
+    const blob = await documentApis.downloadDocument(row.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = row.fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    // 错误已由 http 拦截器提示
+  } finally {
+    downloadingId.value = null
+  }
+}
+
 function handleDeleteDoc(row: DocumentRow) {
   ElMessageBox.confirm(
     `确定删除文档「${row.fileName}」吗? 相关切片也会一并清理(Qdrant 向量同步删除)。`,
@@ -416,7 +438,15 @@ defineExpose({ loadDocs })
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right" align="center" v-if="canOperate">
           <template #default="{ row }">
-            <el-button text type="primary" size="small" :icon="Download" disabled title="下载功能待开发">下载</el-button>
+            <el-button
+              text
+              type="primary"
+              size="small"
+              :icon="Download"
+              :disabled="row._localTemp || downloadingId === row.id"
+              :loading="downloadingId === row.id"
+              @click="handleDownloadDoc(row)"
+            >下载</el-button>
             <el-button text type="danger" size="small" :icon="Delete" :disabled="row._localTemp" :title="row._localTemp ? '上传完成后可删除' : '删除文档及所有切片'" @click="handleDeleteDoc(row)">删除</el-button>
           </template>
         </el-table-column>

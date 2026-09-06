@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -25,13 +26,18 @@ import { AuthenticatedUser } from '@/common/types';
 import { DocumentService } from './document.service';
 import { DocumentListQueryDto } from './dto/document-list.dto';
 import { ChunkListQueryDto } from './dto/chunk-list.dto';
+import { StorageService } from '@/common/storage/storage.service';
+import * as path from 'node:path';
 
 @ApiTags('文档管理')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('document')
 export class DocumentController {
-  constructor(private readonly documentService: DocumentService) {}
+  constructor(
+    private readonly documentService: DocumentService,
+    private readonly storage: StorageService,
+  ) {}
 
   @Post('upload')
   @UseInterceptors(
@@ -79,5 +85,45 @@ export class DocumentController {
   @ApiOperation({ summary: '删除文档(软删 + 异步清理Qdrant向量/本地文件/统计)' })
   delete(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.documentService.deleteDocument(user, id);
+  }
+
+  @Get(':id/download')
+  @ApiOperation({ summary: '下载文档原始文件' })
+  async download(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Res() res: any,
+  ) {
+    const { storageKey, fileName, fileType } =
+      await this.documentService.getDocumentForDownload(user, id);
+
+    // Content-Type 映射
+    const mimeMap: Record<string, string> = {
+      pdf: 'application/pdf',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      xls: 'application/vnd.ms-excel',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ppt: 'application/vnd.ms-powerpoint',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      md: 'text/markdown; charset=utf-8',
+      txt: 'text/plain; charset=utf-8',
+      csv: 'text/csv; charset=utf-8',
+    };
+    const mimeType = mimeMap[fileType] || 'application/octet-stream';
+
+    // 文件名编码 (RFC 5987), 兼容中文
+    // - filename="..." 只允许 ASCII, 非 ASCII 字符替换为下划线
+    // - filename*=UTF-8''... 用 encodeURIComponent 传递原始 UTF-8 文件名
+    const asciiFallback = fileName.replace(/[^\x20-\x7E]/g, '_');
+    const encodedName = encodeURIComponent(fileName).replace(/['()]/g, escape).replace(/\*/g, '%2A');
+    const contentDisposition = `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedName}`;
+
+    const buffer = await this.storage.read(storageKey);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', contentDisposition);
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'private, max-age=0');
+    res.end(buffer);
   }
 }

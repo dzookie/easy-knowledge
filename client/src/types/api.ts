@@ -22,6 +22,8 @@ export interface RequestOptions {
   headers?: Record<string, string>
   /** HTTP method, 主要给 request 内部用, http.get/post 等已固定 */
   method?: string
+  /** 响应类型, 如 'blob' 用于文件下载 */
+  responseType?: 'json' | 'blob' | 'arraybuffer' | 'text'
 }
 
 /** postForm 上传表单 (含文件) 选项 */

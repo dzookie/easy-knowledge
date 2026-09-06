@@ -67,10 +67,16 @@ axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 /** 响应拦截: 解包 { code, message, data } 并统一错误处理
  *  返回 body.data -> 调用方拿到的就是业务数据, 不再包 AxiosResponse
+ *
+ *  blob 下载响应直接返回原始 response.data (Blob), 不做 JSON 解包
  */
 axiosInstance.interceptors.response.use(
   // HTTP 2xx 进入成功分支
   (response) => {
+    // blob 下载: 直接返回 Blob, 不走 JSON 解包
+    if (response.config.responseType === 'blob') {
+      return response.data as unknown as AxiosResponse
+    }
     const body = response.data as ApiResponse
     // 401: token 失效, 清除登录态
     if (body.code === 401) {
@@ -89,17 +95,31 @@ axiosInstance.interceptors.response.use(
     return body.data as unknown as AxiosResponse
   },
   // HTTP 4xx/5xx 进入错误分支
-  (error) => {
-    // 401: 后端可能直接以 HTTP 401 返回 (例如 token 完全无效)
-    if (error.response?.status === 401) {
+  async (error) => {
+    const isBlob = error.config?.responseType === 'blob'
+
+    // blob 请求的错误响应也是 Blob, 需要先转成文本再解析 JSON
+    let body: ApiResponse | undefined
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text()
+        body = JSON.parse(text) as ApiResponse
+      } catch {
+        // 非 JSON 错误响应, 忽略
+      }
+    } else {
+      body = error.response?.data as ApiResponse | undefined
+    }
+
+    // 401: token 失效
+    if (error.response?.status === 401 || body?.code === 401) {
       const auth = useAuthStore()
       auth.logout(true)
-      const msg = error.response.data?.message || '登录已过期,请重新登录'
+      const msg = body?.message || '登录已过期,请重新登录'
       ElMessage.error(msg)
       throw new HttpError(401, msg)
     }
-    // 后端业务错误以 HTTP 4xx 返回时, body 里仍带 code/message
-    const body = error.response?.data as ApiResponse | undefined
+    // 后端业务错误
     if (body && typeof body.code === 'number') {
       ElMessage.error(body.message || '请求失败')
       throw new HttpError(body.code, body.message || '请求失败')
@@ -122,6 +142,7 @@ function toAxiosConfig(opts: RequestOptions): AxiosRequestConfig {
     headers: opts.headers,
     params: opts.params,
     data: opts.body,
+    responseType: opts.responseType,
   }
 }
 
@@ -147,5 +168,18 @@ export const http = {
           opts.onProgress?.(p)
         }
       },
+    }),
+  /**
+   * 下载文件 (blob 方式, 自动携带鉴权 header)
+   *
+   * 用法:
+   *   const blob = await http.download('/api/document/1/download')
+   *   saveAs(blob, '文件名.pdf')
+   */
+  download: (url: string) =>
+    axiosInstance.request<Blob, Blob>({
+      url,
+      method: 'GET',
+      responseType: 'blob',
     }),
 }

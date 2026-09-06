@@ -1,147 +1,101 @@
 <script setup lang="ts">
 /**
  * 主控台 (Dashboard) — 登录后默认首页
- * 展示系统关键指标、最近活动、系统状态
- * 数据为 mock, 后端就绪后替换为真实 API
+ * 展示系统关键指标、知识库分布、最近文档、系统状态
  */
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import {
   Collection, Document, ChatDotRound, User,
   TrendCharts, Cpu, DataLine, CircleCheck,
-  ArrowUp, ArrowDown,
+  Files,
 } from '@element-plus/icons-vue'
+import { dashboardApis } from '@/apis'
+import type {
+  OverviewStats,
+  KbDistributionItem,
+  RecentDocumentItem,
+  SystemStatusItem,
+} from '@/apis/dashboard'
+
+/* -------- 数据 -------- */
+const overview = ref<OverviewStats | null>(null)
+const kbDistribution = ref<KbDistributionItem[]>([])
+const recentDocs = ref<RecentDocumentItem[]>([])
+const systemStatus = ref<SystemStatusItem[]>([])
+const loading = ref(false)
 
 /* -------- 统计卡片 -------- */
-const stats = ref([
-  {
-    key: 'knowledge',
-    label: '知识库总数',
-    value: 12,
-    unit: '个',
-    trend: 2,
-    trendUp: true,
-    icon: Collection,
-    color: 'primary',
-  },
-  {
-    key: 'documents',
-    label: '文档总数',
-    value: 386,
-    unit: '份',
-    trend: 18,
-    trendUp: true,
-    icon: Document,
-    color: 'success',
-  },
-  {
-    key: 'queries',
-    label: '本月问答',
-    value: 1284,
-    unit: '次',
-    trend: 12.5,
-    trendUp: true,
-    icon: ChatDotRound,
-    color: 'warning',
-  },
-  {
-    key: 'users',
-    label: '活跃用户',
-    value: 24,
-    unit: '人',
-    trend: 3,
-    trendUp: false,
-    icon: User,
-    color: 'info',
-  },
+const statCards = ref([
+  { key: 'knowledge', label: '知识库总数', value: 0, unit: '个', icon: Collection, color: 'primary' },
+  { key: 'documents', label: '文档总数', value: 0, unit: '份', icon: Document, color: 'success' },
+  { key: 'chunks', label: '切片总数', value: 0, unit: '条', icon: DataLine, color: 'warning' },
+  { key: 'calls', label: 'API 调用', value: 0, unit: '次', icon: ChatDotRound, color: 'info' },
 ])
 
-/* -------- 知识库容量分布 -------- */
-const kbDistribution = ref([
-  { name: '产品手册', docs: 86, percent: 75 },
-  { name: 'FAQ 整理', docs: 124, percent: 92 },
-  { name: '历史工单', docs: 132, percent: 88 },
-  { name: '研发规范', docs: 44, percent: 35 },
-])
-
-/* -------- 最近问答活动 -------- */
-const recentChats = ref([
-  {
-    user: '张明',
-    question: '产品 V2.3 的登录流程是怎样的?',
-    kb: '产品手册',
-    time: '2 分钟前',
-    status: 'success',
-  },
-  {
-    user: '李华',
-    question: '如何配置切片重叠参数?',
-    kb: '研发规范',
-    time: '15 分钟前',
-    status: 'success',
-  },
-  {
-    user: '王芳',
-    question: '历史工单里关于退款的处理时效?',
-    kb: '历史工单',
-    time: '1 小时前',
-    status: 'success',
-  },
-  {
-    user: '赵强',
-    question: 'FAQ 中有关于会员升级的说明吗?',
-    kb: 'FAQ 整理',
-    time: '3 小时前',
-    status: 'partial',
-  },
-  {
-    user: '陈静',
-    question: '系统支持哪些 Embedding 模型?',
-    kb: '产品手册',
-    time: '昨天',
-    status: 'success',
-  },
-])
-
-/* -------- 系统状态 -------- */
-const systemStatus = ref([
-  { name: 'API 服务', healthy: true, latency: '32ms' },
-  { name: 'MySQL 数据库', healthy: true, latency: '4ms' },
-  { name: 'Qdrant 向量库', healthy: true, latency: '12ms' },
-  { name: 'Redis 缓存', healthy: true, latency: '1ms' },
-  { name: 'MinIO 对象存储', healthy: true, latency: '8ms' },
-  { name: 'Embedding 服务', healthy: false, latency: '超时' },
-])
-
-function statusTag(s: string) {
-  return s === 'success' ? 'success' : 'warning'
+/* -------- 文档状态映射 -------- */
+const docStatusMap: Record<number, { label: string; type: string }> = {
+  0: { label: '等待处理', type: 'info' },
+  1: { label: '处理中', type: 'warning' },
+  2: { label: '成功', type: 'success' },
+  3: { label: '失败', type: 'danger' },
 }
-function statusLabel(s: string) {
-  return s === 'success' ? '已命中' : '部分命中'
+
+function formatBytes(bytes: string): string {
+  const n = Number(bytes) || 0
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`
 }
+
+function formatTime(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const diff = now.getTime() - d.getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return '刚刚'
+  if (min < 60) return `${min} 分钟前`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr} 小时前`
+  const day = Math.floor(hr / 24)
+  if (day < 7) return `${day} 天前`
+  return d.toLocaleDateString('zh-CN')
+}
+
+/* -------- 加载数据 -------- */
+async function loadAll() {
+  loading.value = true
+  try {
+    const [ov, dist, docs, status] = await Promise.all([
+      dashboardApis.getOverview(),
+      dashboardApis.getKbDistribution(5),
+      dashboardApis.getRecentDocuments(8),
+      dashboardApis.getSystemStatus(),
+    ])
+
+    overview.value = ov
+    statCards.value[0].value = ov.knowledgeBaseCount
+    statCards.value[1].value = ov.documentCount
+    statCards.value[2].value = ov.chunkCount
+    statCards.value[3].value = ov.totalCalls
+
+    kbDistribution.value = dist
+    recentDocs.value = docs
+    systemStatus.value = status
+  } catch (e) {
+    console.error('加载主控台数据失败', e)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadAll)
 </script>
 
 <template>
-  <div class="dashboard">
-    <!-- 欢迎横幅 -->
-    <section class="welcome-banner">
-      <div class="welcome-content">
-        <h2 class="welcome-title">欢迎回来 👋</h2>
-        <p class="welcome-desc">
-          今天有 <strong>12</strong> 条新的问答请求,
-          <strong>3</strong> 份文档待解析。
-          系统运行稳定,继续探索你的知识库吧。
-        </p>
-        <div class="welcome-actions">
-          <el-button type="primary" :icon="ChatDotRound">开始问答</el-button>
-          <el-button :icon="Document">上传文档</el-button>
-        </div>
-      </div>
-      <div class="welcome-deco" />
-    </section>
-
+  <div class="dashboard" v-loading="loading">
     <!-- 统计卡片 -->
     <section class="stats-grid">
-      <el-card v-for="s in stats" :key="s.key" shadow="never" class="stat-card">
+      <el-card v-for="s in statCards" :key="s.key" shadow="never" class="stat-card">
         <div class="stat-body">
           <div class="stat-icon" :class="`stat-icon--${s.color}`">
             <el-icon :size="20"><component :is="s.icon" /></el-icon>
@@ -152,12 +106,6 @@ function statusLabel(s: string) {
               <span class="stat-value">{{ s.value.toLocaleString() }}</span>
               <span class="stat-unit">{{ s.unit }}</span>
             </div>
-            <div class="stat-trend" :class="s.trendUp ? 'stat-trend--up' : 'stat-trend--down'">
-              <el-icon :size="12">
-                <component :is="s.trendUp ? ArrowUp : ArrowDown" />
-              </el-icon>
-              <span>{{ s.trend }}% 较上周</span>
-            </div>
           </div>
         </div>
       </el-card>
@@ -165,7 +113,7 @@ function statusLabel(s: string) {
 
     <!-- 中部: 分布 + 状态 -->
     <section class="middle-grid">
-      <!-- 知识库容量分布 -->
+      <!-- 知识库文档分布 -->
       <el-card shadow="never" class="panel-card">
         <template #header>
           <div class="panel-head">
@@ -173,14 +121,14 @@ function statusLabel(s: string) {
               <el-icon class="panel-icon"><DataLine /></el-icon>
               <span class="panel-title">知识库文档分布</span>
             </div>
-            <el-tag size="small" effect="plain">TOP 4</el-tag>
+            <el-tag size="small" effect="plain">TOP {{ kbDistribution.length }}</el-tag>
           </div>
         </template>
-        <div class="kb-list">
-          <div v-for="kb in kbDistribution" :key="kb.name" class="kb-item">
+        <div v-if="kbDistribution.length" class="kb-list">
+          <div v-for="kb in kbDistribution" :key="kb.id" class="kb-item">
             <div class="kb-item-head">
               <span class="kb-name">{{ kb.name }}</span>
-              <span class="kb-count">{{ kb.docs }} 份</span>
+              <span class="kb-count">{{ kb.docs }} 份 / {{ kb.chunks }} 切片</span>
             </div>
             <el-progress
               :percentage="kb.percent"
@@ -191,6 +139,7 @@ function statusLabel(s: string) {
             <span class="kb-percent">{{ kb.percent }}%</span>
           </div>
         </div>
+        <el-empty v-else description="暂无知识库" :image-size="80" />
       </el-card>
 
       <!-- 系统状态 -->
@@ -201,9 +150,14 @@ function statusLabel(s: string) {
               <el-icon class="panel-icon"><Cpu /></el-icon>
               <span class="panel-title">系统状态</span>
             </div>
-            <el-tag type="success" size="small" effect="light">
+            <el-tag
+              v-if="systemStatus.length"
+              :type="systemStatus.every((s) => s.healthy) ? 'success' : 'danger'"
+              size="small"
+              effect="light"
+            >
               <el-icon style="margin-right: 4px;"><CircleCheck /></el-icon>
-              5/6 正常
+              {{ systemStatus.filter((s) => s.healthy).length }}/{{ systemStatus.length }} 正常
             </el-tag>
           </div>
         </template>
@@ -212,47 +166,54 @@ function statusLabel(s: string) {
             <span class="status-dot" :class="item.healthy ? 'status-dot--ok' : 'status-dot--err'" />
             <span class="status-name">{{ item.name }}</span>
             <span class="status-latency" :class="!item.healthy && 'status-latency--err'">
-              {{ item.latency }}
+              {{ item.healthy ? item.latency : item.error || '异常' }}
             </span>
           </li>
         </ul>
       </el-card>
     </section>
 
-    <!-- 最近问答活动 -->
+    <!-- 最近文档处理 -->
     <section class="recent-section">
       <el-card shadow="never" class="panel-card">
         <template #header>
           <div class="panel-head">
             <div class="panel-head-left">
-              <el-icon class="panel-icon"><TrendCharts /></el-icon>
-              <span class="panel-title">最近问答活动</span>
+              <el-icon class="panel-icon"><Files /></el-icon>
+              <span class="panel-title">最近文档处理</span>
             </div>
-            <el-button text type="primary" size="small">查看全部</el-button>
+            <el-button text type="primary" size="small" @click="$router.push('/knowledge')">前往知识库</el-button>
           </div>
         </template>
-        <el-table :data="recentChats" style="width: 100%;">
-          <el-table-column label="用户" width="100">
+        <el-table v-if="recentDocs.length" :data="recentDocs" style="width: 100%;">
+          <el-table-column label="文档名" min-width="220" show-overflow-tooltip>
             <template #default="{ row }">
-              <div class="chat-user">
-                <div class="chat-user-avatar">{{ row.user.slice(0, 1) }}</div>
-                <span>{{ row.user }}</span>
+              <div class="doc-name-cell">
+                <span class="doc-ext">{{ row.fileType.toUpperCase() }}</span>
+                <span class="doc-file-name">{{ row.fileName }}</span>
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="question" label="问题" min-width="280" show-overflow-tooltip />
-          <el-table-column prop="kb" label="命中知识库" width="140">
-            <template #default="{ row }">
-              <el-tag size="small" effect="plain">{{ row.kb }}</el-tag>
-            </template>
+          <el-table-column prop="kbName" label="所属知识库" width="140" show-overflow-tooltip />
+          <el-table-column prop="uploader" label="上传者" width="100" />
+          <el-table-column label="大小" width="100">
+            <template #default="{ row }">{{ formatBytes(row.sizeBytes) }}</template>
+          </el-table-column>
+          <el-table-column label="切片" width="80">
+            <template #default="{ row }">{{ row.chunkCount || '-' }}</template>
           </el-table-column>
           <el-table-column label="状态" width="100">
             <template #default="{ row }">
-              <el-tag :type="statusTag(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
+              <el-tag :type="docStatusMap[row.status]?.type" size="small">
+                {{ docStatusMap[row.status]?.label }}
+              </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="time" label="时间" width="120" />
+          <el-table-column label="时间" width="120">
+            <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+          </el-table-column>
         </el-table>
+        <el-empty v-else description="暂无文档记录" :image-size="80" />
       </el-card>
     </section>
   </div>
@@ -263,58 +224,6 @@ function statusLabel(s: string) {
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-/* ===== 欢迎横幅 ===== */
-.welcome-banner {
-  position: relative;
-  overflow: hidden;
-  padding: 32px;
-  border-radius: var(--radius-lg);
-  background:
-    radial-gradient(ellipse at top right, color-mix(in srgb, var(--primary) 14%, transparent), transparent 60%),
-    radial-gradient(ellipse at bottom left, color-mix(in srgb, var(--success) 8%, transparent), transparent 50%),
-    var(--card);
-  border: 1px solid var(--border-100);
-}
-.welcome-content {
-  position: relative;
-  z-index: 1;
-  max-width: 640px;
-}
-.welcome-title {
-  margin: 0 0 8px;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 28px;
-  line-height: 1.2;
-  color: var(--foreground);
-}
-.welcome-desc {
-  margin: 0 0 20px;
-  font-family: var(--font-serif);
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--muted-foreground);
-}
-.welcome-desc strong {
-  color: var(--primary);
-  font-weight: 600;
-}
-.welcome-actions {
-  display: flex;
-  gap: 10px;
-}
-.welcome-deco {
-  position: absolute;
-  top: -60px;
-  right: -40px;
-  width: 220px;
-  height: 220px;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--primary) 18%, transparent);
-  filter: blur(2px);
-  pointer-events: none;
 }
 
 /* ===== 统计卡片 ===== */
@@ -370,7 +279,6 @@ function statusLabel(s: string) {
   display: flex;
   align-items: baseline;
   gap: 4px;
-  margin-bottom: 6px;
 }
 .stat-value {
   font: 600 24px/1.1 var(--font-display);
@@ -381,15 +289,6 @@ function statusLabel(s: string) {
   font-size: 12px;
   color: var(--muted-foreground);
 }
-.stat-trend {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-.stat-trend--up { color: var(--success); }
-.stat-trend--down { color: var(--destructive); }
 
 /* ===== 中部网格 ===== */
 .middle-grid {
@@ -503,33 +402,32 @@ function statusLabel(s: string) {
   color: var(--destructive);
 }
 
-/* ===== 最近问答 ===== */
+/* ===== 最近文档 ===== */
 .recent-section :deep(.el-card__body) {
   padding: 0;
 }
-.chat-user {
+.doc-name-cell {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.chat-user-avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-full);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font: 600 11px var(--font-sans);
-  flex-shrink: 0;
+.doc-ext {
+  display: inline-block;
+  min-width: 40px;
+  text-align: center;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font: 600 11px var(--font-mono);
+}
+.doc-file-name {
+  font-size: 13px;
+  color: var(--foreground);
 }
 
 /* 响应式 */
 @media (max-width: 768px) {
-  .welcome-banner { padding: 20px; }
-  .welcome-title { font-size: 22px; }
-  .welcome-actions { flex-wrap: wrap; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .middle-grid { grid-template-columns: 1fr; }
 }

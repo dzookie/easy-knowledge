@@ -21,4 +21,11 @@ export const documentApis = {
 
   deleteDocument: (id: string) =>
     http.delete(`/api/document/${id}`),
+
+  /**
+   * 下载文档原始文件 (返回 Blob)
+   * 调用方需自行用 URL.createObjectURL + a.download 触发保存
+   */
+  downloadDocument: (id: string) =>
+    http.download(`/api/document/${id}/download`),
 }

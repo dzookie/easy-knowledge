@@ -152,6 +152,38 @@ export class DocumentService {
     };
   }
 
+  /**
+   * 获取下载所需的文档信息 (含鉴权)
+   *
+   * 权限: 管理员 / 文档上传者 / 知识库创建者
+   * @returns { storageKey, fileName, fileType } 供 Controller 流式输出
+   */
+  async getDocumentForDownload(user: AuthenticatedUser, docId: string) {
+    const doc = await this.prisma.document.findFirst({
+      where: { id: BigInt(docId), deletedAt: null },
+      include: {
+        knowledgeBase: { select: { id: true, createdBy: true } },
+      },
+    });
+    if (!doc) throw new NotFoundException('文档不存在');
+
+    const canDownload =
+      user.role === 'admin' ||
+      doc.uploadedBy === BigInt(user.id) ||
+      doc.knowledgeBase.createdBy === BigInt(user.id);
+    if (!canDownload) throw new ForbiddenException('无权限下载该文档');
+
+    if (!this.storage.exists(doc.storageKey)) {
+      throw new NotFoundException('文件不存在或已被删除');
+    }
+
+    return {
+      storageKey: doc.storageKey,
+      fileName: normalizeFilename(doc.fileName),
+      fileType: doc.fileType,
+    };
+  }
+
   /** 软删 + 异步清理 */
   async deleteDocument(user: AuthenticatedUser, docId: string) {
     const doc = await this.prisma.document.findFirst({

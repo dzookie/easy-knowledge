@@ -15,6 +15,7 @@ import { DocumentModule } from './modules/document/document.module';
 import { RetrievalModule } from './modules/retrieval/retrieval.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { ServiceModule } from './modules/service/service.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ServiceModule } from './modules/service/service.module';
     RetrievalModule,
     ChatModule,
     ServiceModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}
