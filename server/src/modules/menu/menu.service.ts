@@ -90,7 +90,6 @@ export class MenuService {
         path: dto.path || null,
         component: dto.component || null,
         icon: dto.icon || null,
-        permission: dto.permission || null,
         sort: dto.sort ?? 0,
         visible: dto.visible ?? 1,
         status: dto.status ?? 1,
@@ -131,7 +130,6 @@ export class MenuService {
         path: dto.path,
         component: dto.component,
         icon: dto.icon,
-        permission: dto.permission,
         sort: dto.sort,
         visible: dto.visible,
         status: dto.status,
@@ -208,7 +206,6 @@ export class MenuService {
       path: string | null;
       component: string | null;
       icon: string | null;
-      permission: string | null;
       sort: number;
       visible: number;
       status: number;
@@ -226,7 +223,6 @@ export class MenuService {
         path: m.path,
         component: m.component,
         icon: m.icon,
-        permission: m.permission,
         sort: m.sort,
         visible: m.visible === 1,
         status: m.status,

@@ -34,6 +34,8 @@ model User {
   knowledgeBases KnowledgeBase[]
   uploadedDocuments Document[] @relation("DocumentUploader")
   apiKeys       ApiKey[]
+  workflows     Workflow[]
+  workflowRuns  WorkflowRun[] @relation("WorkflowRunExecutor")
 
   @@index([roleId])
   @@index([status])
@@ -70,7 +72,6 @@ model Menu {
   path        String?   @db.VarChar(128)
   component   String?   @db.VarChar(128)
   icon        String?   @db.VarChar(64)
-  permission  String?   @db.VarChar(128)
   sort        Int       @default(0)
   visible     Int       @default(1) @db.TinyInt
   status      Int       @default(1) @db.TinyInt
@@ -266,4 +267,70 @@ model ApiKey {
   @@index([userId])
   @@index([status])
   @@map("api_key")
+}
+
+/// 工作流定义表
+/// 存储可视化编排的工作流 DSL (JSON), 参考 Dify 的编排器
+model Workflow {
+  id          BigInt    @id @default(autoincrement())
+  /// 业务编码, 唯一, 用于 URL 引用
+  code        String    @unique @db.VarChar(64)
+  name        String    @db.VarChar(100)
+  description String?   @db.VarChar(500)
+  /// 工作流 DSL (JSON), 包含 nodes / edges / version
+  /// 使用 LongText 避免 MySQL 默认 Text 行数限制
+  graph       String    @db.LongText
+  /// 版本号, 每次发布自增
+  version     Int       @default(1)
+  /// 0=草稿 1=已发布 2=已归档
+  status      Int       @default(0) @db.TinyInt
+  /// 创建者
+  createdBy   BigInt    @map("created_by")
+  creator     User      @relation(fields: [createdBy], references: [id])
+
+  runs        WorkflowRun[]
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  @@index([createdBy])
+  @@index([status])
+  @@map("workflow")
+}
+
+/// 工作流执行记录
+model WorkflowRun {
+  id            BigInt    @id @default(autoincrement())
+  workflowId    BigInt    @map("workflow_id")
+  workflow      Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  /// 执行时的 graph 快照 (DSL JSON)
+  graphSnapshot String    @map("graph_snapshot") @db.LongText
+  /// 输入 (JSON 字符串)
+  inputs        String    @db.Text
+  /// 输出 (JSON 字符串)
+  outputs       String?   @db.Text
+  /// 0=待执行 1=运行中 2=成功 3=失败 4=取消
+  status        Int       @default(0) @db.TinyInt
+  errorMsg      String?   @map("error_msg") @db.VarChar(1000)
+  /// 节点执行轨迹 (JSON: [{nodeId,type,title,status,durationMs,outputs}])
+  nodeTrace     String?   @map("node_trace") @db.LongText
+  /// 执行耗时(ms)
+  durationMs    Int?      @map("duration_ms") @db.UnsignedInt
+  /// token 总消耗(粗略统计)
+  totalTokens   Int?      @map("total_tokens") @db.UnsignedInt
+  /// 触发方式: manual / api
+  trigger       String    @default("manual") @db.VarChar(16)
+  /// 执行人
+  executedBy    BigInt    @map("executed_by")
+  executor      User      @relation("WorkflowRunExecutor", fields: [executedBy], references: [id])
+
+  startedAt     DateTime? @map("started_at")
+  finishedAt    DateTime? @map("finished_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([executedBy])
+  @@map("workflow_run")
 }

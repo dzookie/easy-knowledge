@@ -28,8 +28,9 @@ export class DashboardService {
   async getOverview(user: AuthenticatedUser) {
     const isAdmin = user.role === 'admin';
 
-    const where = isAdmin ? {} : { createdBy: BigInt(user.id) };
     const kbWhere = isAdmin ? {} : { createdBy: BigInt(user.id) };
+    // document 表用 uploadedBy 关联上传者 (无 createdBy 字段)
+    const docWhere = isAdmin ? {} : { uploadedBy: BigInt(user.id) };
 
     // 普通用户先查自己的知识库 ID 列表, 用于过滤切片
     const userKbIds = isAdmin
@@ -47,7 +48,7 @@ export class DashboardService {
         this.prisma.knowledgeBase.count({ where: { ...kbWhere, deletedAt: null } }),
         this.prisma.document.count({
           where: {
-            ...where,
+            ...docWhere,
             deletedAt: null,
           },
         }),

@@ -8,6 +8,7 @@ export interface MenuItem {
   name: string
   type: number          // 1目录 2菜单 3按钮
   path: string | null
+  component: string | null   // 前端组件相对路径, 如 "admin/dashboard/index"
   icon: string | null
   sort: number
   visible: boolean

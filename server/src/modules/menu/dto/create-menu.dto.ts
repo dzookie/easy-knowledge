@@ -33,11 +33,6 @@ export class CreateMenuDto {
   @IsString()
   icon?: string;
 
-  @ApiPropertyOptional({ example: 'menu:list', description: '权限标识(按钮类型用)' })
-  @IsOptional()
-  @IsString()
-  permission?: string;
-
   @ApiPropertyOptional({ example: 0, description: '排序, 越小越靠前' })
   @IsOptional()
   @IsInt()

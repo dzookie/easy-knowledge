@@ -8,6 +8,14 @@ import {
   type BaseMessage,
 } from '@langchain/core/messages';
 import { StringOutputParser } from '@langchain/core/output_parsers';
+import type { RagSource } from '@/common/rag/rag.service';
+
+/** RAG 评估结果: 判断是否需要再次检索 */
+export interface EvaluateResult {
+  need_retrieve: boolean;
+  reason: string;
+  rewritten_query?: string;
+}
 
 /**
  * LLM 公共服务 — 基于 LangChain.js + DeepSeek
@@ -121,6 +129,60 @@ export class LlmService implements OnModuleInit {
         const text = typeof content === 'string' ? content : '';
         if (text) yield { type: 'content', text };
       }
+    }
+  }
+
+  /**
+   * evaluate: 判断 generate 节点的回答是否完整回答了用户问题
+   *
+   * 用于 RAG Agent ReAct 循环: generate 完成后, 调用本方法决定是否需要再检索一次.
+   * 输出 JSON: { need_retrieve, reason, rewritten_query? }
+   *
+   * 使用非流式同步实例 (chatModelSync), 保证一次 invoke 拿到完整结果.
+   * 若 LLM 不支持 response_format 或返回非法 JSON, fallback 到默认 { need_retrieve: false }.
+   */
+  async evaluateAnswer(
+    query: string,
+    sources: RagSource[],
+    answer: string,
+    history: { role: 'user' | 'assistant'; content: string }[],
+  ): Promise<EvaluateResult> {
+    const sys = `你是一个 RAG 评估器。判断下面的回答是否完整回答了用户的问题。
+- 如果回答完整且基于参考资料 → 输出 {"need_retrieve": false, "reason": "回答已完整"}
+- 如果回答含糊 / 未基于资料 / 明确说"参考资料不足" / 没有正面回答 → 输出 {"need_retrieve": true, "reason": "...", "rewritten_query": "建议的新查询词"}
+
+只输出 JSON, 不要任何其他文字或代码块包裹。`;
+
+    const context = sources
+      .map((s, i) => `[${i + 1}] ${s.content}`)
+      .join('\n');
+
+    const messages: BaseMessage[] = [
+      new SystemMessage(sys),
+      new HumanMessage(
+        `用户问题: ${query}\n\n参考资料:\n${context || '(无)'}\n\n历史对话:\n${history.map((m) => `${m.role}: ${m.content}`).join('\n') || '(无)'}\n\n回答:\n${answer}`,
+      ),
+    ];
+
+    try {
+      const res = await this.chatModelSync.invoke(messages, {
+        response_format: { type: 'json_object' },
+      } as any);
+      const text = (res as AIMessage).content as string;
+      const parsed = JSON.parse(text);
+      return {
+        need_retrieve: Boolean(parsed.need_retrieve),
+        reason: String(parsed.reason ?? ''),
+        rewritten_query: parsed.rewritten_query ? String(parsed.rewritten_query) : undefined,
+      };
+    } catch (err) {
+      this.logger.warn(
+        `evaluateAnswer 解析失败, 默认不重试: ${(err as Error).message}`,
+      );
+      return {
+        need_retrieve: false,
+        reason: 'evaluate 失败, 默认接受当前回答',
+      };
     }
   }
 }

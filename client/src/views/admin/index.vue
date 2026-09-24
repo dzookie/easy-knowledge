@@ -4,16 +4,15 @@
  * 布局: 左侧 Sidebar(品牌 + 导航) + 右侧主内容区(Header + 子路由出口)
  *
  * 菜单从后端动态获取(根据当前登录用户角色), 不再前端写死
+ * 菜单数据由路由守卫在登录后统一加载 (router/index.ts), 此组件只负责渲染
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-import { Sunny, Moon, SwitchButton } from '@element-plus/icons-vue'
 import { useTheme } from '@/composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
 import { useMenuStore } from '@/stores/menu'
-import type { MenuItem } from '@/types'
+import { Sunny, Moon, SwitchButton } from '@element-plus/icons-vue'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,24 +22,6 @@ const menuStore = useMenuStore()
 
 // Element Plus 图标全集(用于动态渲染 <component :is="iconMap[name]" />)
 const iconMap = ElementPlusIconsVue as unknown as Record<string, any>
-
-/* 菜单加载状态 */
-const menuLoading = ref(false)
-
-/* 拉取菜单 */
-async function loadMenus() {
-  if (menuStore.loaded) return
-  menuLoading.value = true
-  try {
-    await menuStore.fetchCurrentUserMenus()
-  } catch {
-    // 401 由 http 拦截器处理, 这里兜底
-  } finally {
-    menuLoading.value = false
-  }
-}
-
-onMounted(loadMenus)
 
 /* 当前激活的菜单 key(取路由 path) */
 const activeMenu = computed(() => route.path)
@@ -59,11 +40,12 @@ const avatarText = computed(() => {
   return name.slice(0, 2).toUpperCase()
 })
 
-/* 退出登录 */
+/* 退出登录: 硬刷新让 router 重新初始化, 彻底避免动态路由名残留导致切角色越权 */
 function logout() {
-  auth.logout()          // store 内部统一弹提示
+  auth.logout()
   menuStore.reset()
-  router.push('/login')
+  // 清 token 后硬刷新, router 会走全新守卫流程, 无动态路由残留
+  window.location.href = '/login'
 }
 
 /* 递归渲染菜单项 */
@@ -89,7 +71,8 @@ function renderIcon(iconName: string | null) {
         :router="true"
         @select="onMenuSelect"
       >
-        <template v-if="menuLoading">
+        <!-- 菜单未加载时显示占位 (守卫加载完菜单后才会进入此页面, 此分支主要应对边界情况) -->
+        <template v-if="!menuStore.loaded">
           <div class="admin-menu-loading">加载菜单中...</div>
         </template>
         <template v-else>

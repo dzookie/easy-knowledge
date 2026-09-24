@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * 菜单管理 — 树形表格 + 新增/编辑/删除
  *
@@ -33,7 +33,6 @@ interface MenuRow {
   path: string | null
   component: string | null
   icon: string | null
-  permission: string | null
   sort: number
   visible: boolean
   status: number
@@ -48,7 +47,6 @@ interface MenuForm {
   path: string
   component: string
   icon: string
-  permission: string
   sort: number
   visible: number
   status: number
@@ -71,7 +69,6 @@ const defaultForm = (): MenuForm => ({
   path: '',
   component: '',
   icon: '',
-  permission: '',
   sort: 0,
   visible: 1,
   status: 1,
@@ -187,7 +184,6 @@ function openEdit(row: MenuRow) {
     path: row.path || '',
     component: row.component || '',
     icon: row.icon || '',
-    permission: row.permission || '',
     sort: row.sort,
     visible: row.visible ? 1 : 0,
     status: row.status,
@@ -205,25 +201,21 @@ async function handleSubmit() {
     ElMessage.warning('菜单类型必须填写路由路径')
     return
   }
-  if (form.type === 3 && !form.permission.trim()) {
-    ElMessage.warning('按钮类型必须填写权限标识')
-    return
-  }
 
   submitting.value = true
   try {
     const payload = { ...form }
     if (form.id) {
       await menuApis.updateMenu(form.id, payload)
-      ElMessage.success('菜单修改成功')
+      ElMessage.success('菜单修改成功, 刷新页面后路由生效')
     } else {
       delete (payload as any).id
       await menuApis.createMenu(payload)
-      ElMessage.success('菜单新增成功')
+      ElMessage.success('菜单新增成功, 刷新页面后路由生效')
     }
     dialogVisible.value = false
     await loadMenus()
-    // 刷新侧栏菜单缓存(不刷新页面, 体验更好)
+    // 刷新侧栏菜单缓存(只更新侧栏可见性, 动态路由需刷新页面重新注册)
     await menuStore.fetchCurrentUserMenus()
   } catch {
     // http 拦截器已弹错误提示
@@ -306,18 +298,18 @@ onMounted(loadMenus)
         </template>
       </el-table-column>
 
+      <el-table-column prop="component" label="组件路径" min-width="160" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span class="menu-path">{{ row.component || '-' }}</span>
+        </template>
+      </el-table-column>
+
       <el-table-column prop="icon" label="图标" width="80" align="center">
         <template #default="{ row }">
           <el-icon v-if="row.icon" :size="18" class="menu-icon-preview">
             <component :is="iconMap[row.icon]" />
           </el-icon>
           <span v-else class="menu-icon-empty">-</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column prop="permission" label="权限标识" min-width="120" show-overflow-tooltip>
-        <template #default="{ row }">
-          <span class="menu-permission">{{ row.permission || '-' }}</span>
         </template>
       </el-table-column>
 
@@ -447,10 +439,6 @@ onMounted(loadMenus)
           </el-popover>
         </el-form-item>
 
-        <el-form-item v-if="form.type === 3" label="权限标识" required>
-          <el-input v-model="form.permission" placeholder="如:menu:list" maxlength="128" />
-        </el-form-item>
-
         <el-form-item label="排序">
           <el-input-number v-model="form.sort" :min="0" :max="999" controls-position="right" />
         </el-form-item>
@@ -518,8 +506,7 @@ onMounted(loadMenus)
   color: var(--muted-foreground);
   vertical-align: -2px;
 }
-.menu-path,
-.menu-permission {
+.menu-path {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--muted-foreground);

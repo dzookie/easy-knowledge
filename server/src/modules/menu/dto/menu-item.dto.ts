@@ -25,9 +25,6 @@ export class MenuItemDto {
   @ApiProperty({ example: 'Odometer', description: '图标名(Element Plus 图标组件名)', nullable: true })
   icon!: string | null;
 
-  @ApiProperty({ example: 'menu:list', description: '权限标识(按钮类型用)', nullable: true })
-  permission!: string | null;
-
   @ApiProperty({ example: 1, description: '排序' })
   sort!: number;
 

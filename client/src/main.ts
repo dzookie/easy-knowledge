@@ -5,6 +5,11 @@
  */
 import './styles/index.css'
 
+/* Vue Flow 样式 (工作流编辑器依赖) */
+import '@vue-flow/core/dist/style.css'
+import '@vue-flow/controls/dist/style.css'
+import '@vue-flow/minimap/dist/style.css'
+
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
