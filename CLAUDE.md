@@ -1,10 +1,10 @@
-# CLAUDE.md — EasyKnowledge 项目上下文
+# CLAUDE.md — MindFlow 项目上下文
 
 > 本文件供 Trae / Claude / Cursor 等 AI IDE 自动读取, 帮助 AI 快速理解项目架构与编码约定.
 
 ## 项目概述
 
-EasyKnowledge 是一个类似火山方舟的知识库管理系统, 支持文档上传、解析、切片、向量化、检索和问答.
+MindFlow 是一个知识库管理与工作流编排平台, 支持文档上传、解析、切片、向量化、检索、问答, 以及可视化工作流编排与调试.
 
 - **后端** (`server/`): NestJS 10 + Prisma + MySQL + Qdrant
 - **前端** (`client/`): Vue 3 + Vite + Element Plus + Pinia
@@ -36,9 +36,9 @@ EasyKnowledge 是一个类似火山方舟的知识库管理系统, 支持文档�
 ### 基础设施
 | 服务 | 地址 | 说明 |
 |------|------|------|
-| MySQL | localhost:3306 | 数据库名 easy_knowledge, root/admin123 |
+| MySQL | localhost:3306 | 数据库名 mindflow, root/admin123 |
 | Qdrant | http://127.0.0.1:6333 | Docker 启动, 无 API Key |
-| 千问 Embedding | https://dashscope.aliyuncs.com/compatible-mode/v1 | 阿里云 DashScope 兼容端点 |
+| Embedding | 本地 Ollama qllama/bge-m3:latest (http://127.0.0.1:11434/v1) | 1024 维 |
 
 ## 环境变量 (server/.env)
 
@@ -53,7 +53,7 @@ QDRANT_API_KEY        Qdrant API Key (本地无需)
 QDRANT_VECTOR_SIZE    向量维度 (1024)
 DASHSCOPE_API_KEY     千问 API Key
 DASHSCOPE_BASE_URL    千问 API 端点
-EMBEDDING_MODEL       向量化模型 (qwen3.7-text-embedding)
+EMBEDDING_MODEL       向量化模型 (qllama/bge-m3:latest)
 EMBEDDING_DIMENSION   向量维度 (1024)
 UPLOAD_DIR            文件上传目录 (uploads)
 UPLOAD_MAX_FILE_BYTES 单文件大小上限 (150MB)

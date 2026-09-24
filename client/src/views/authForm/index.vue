@@ -67,15 +67,15 @@ async function submit() {
     <section class="auth-brand">
       <div class="auth-brand-inner">
         <div class="auth-logo">
-          <img src="/logo.svg" alt="Easy-Knowledge" class="auth-logo-mark" />
-          <span class="auth-logo-text">Easy-Knowledge</span>
+          <img src="/logo.svg" alt="MindFlow" class="auth-logo-mark" />
+          <span class="auth-logo-text">MindFlow</span>
         </div>
         <h1 class="auth-hero-title">
-          让知识<br /> searchable &amp; conversational
+          知识 · 流程<br /> mind &amp; flow
         </h1>
         <p class="auth-hero-desc">
-          上传文档,自动切分、向量化,基于 RAG 进行可追溯的智能问答。
-          温暖书卷气,克制赤陶色,为阅读与对话而生。
+          知识库管理与可视化工作流编排，上传文档自动切分向量化，RAG 智能问答，
+          拖拽式流程设计，让 AI 能力自由组合。
         </p>
         <ul class="auth-features">
           <li>
@@ -89,14 +89,14 @@ async function submit() {
             <el-icon><ChatDotRound /></el-icon>
             <div>
               <strong>RAG 问答</strong>
-              <span>引用可追溯,流式渲染</span>
+              <span>引用可追溯，流式渲染</span>
             </div>
           </li>
           <li>
             <el-icon><Tools /></el-icon>
             <div>
-              <strong>多模型适配</strong>
-              <span>qwen3.7 / Doubao / Ollama 自由切换</span>
+              <strong>工作流编排</strong>
+              <span>拖拽式流程设计，可视化调试运行</span>
             </div>
           </li>
         </ul>
@@ -117,7 +117,7 @@ async function submit() {
       <div class="auth-form-wrap">
         <header class="auth-form-head">
           <h2>欢迎回来</h2>
-          <p>登录以继续使用 Easy-Knowledge</p>
+          <p>登录以继续使用 MindFlow</p>
         </header>
 
         <el-form

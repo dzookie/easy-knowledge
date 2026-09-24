@@ -44,8 +44,8 @@ async function bootstrap() {
 
   // ===== Swagger 文档 =====
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Easy-Knowledge API')
-    .setDescription('EK知识库系统 - 后端接口文档')
+    .setTitle('MindFlow API')
+    .setDescription('MindFlow 智能平台 - 后端接口文档')
     .setVersion('0.1.0')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },

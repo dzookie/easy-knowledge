@@ -25,9 +25,9 @@ export class CreateKnowledgeDto {
   description?: string;
 
   @ApiPropertyOptional({
-    example: 'qwen3.7-text-embedding',
-    description: '向量模型, 默认 qwen3.7-text-embedding',
-    default: 'qwen3.7-text-embedding',
+    example: 'qllama/bge-m3:latest',
+    description: '向量模型, 默认 qllama/bge-m3:latest (本地 Ollama)',
+    default: 'qllama/bge-m3:latest',
   })
   @IsOptional()
   @IsString()

@@ -1,5 +1,5 @@
 // ============ Prisma Schema ============
-// Easy-Knowledge 数据库模型
+// MindFlow 数据库模型
 // 文档参考: https://pris.ly/d/prisma-schema
 
 generator client {
@@ -107,8 +107,8 @@ model KnowledgeBase {
   description   String?   @db.VarChar(500)
   /// 封面图(本地存储的相对路径或 URL), 预留
   coverImage    String?   @map("cover_image") @db.VarChar(255)
-  /// 向量模型, 默认 bge-m3
-  embeddingModel String  @map("embedding_model") @db.VarChar(64) @default("bge-m3")
+  /// 向量模型, 默认 qllama/bge-m3:latest (本地 Ollama)
+  embeddingModel String  @map("embedding_model") @db.VarChar(64) @default("qllama/bge-m3:latest")
   /// Qdrant collection 名, 全局唯一
   collection    String    @unique @db.VarChar(128)
   /// 切片策略: 固定长度 / 语义 / 递归, 预留枚举, 当前用字符串

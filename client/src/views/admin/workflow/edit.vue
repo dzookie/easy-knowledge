@@ -157,6 +157,25 @@ function onPaneClick() {
   configNode.value = null
 }
 
+/* ===== 添加节点到画布 ===== */
+function addNodeToCanvas(type: WorkflowNodeType) {
+  if (!canvasRef.value) return
+  
+  const position = { x: 300, y: 200 } // 默认位置，可以根据需要调整
+  const id = `${type}_${Date.now().toString(36)}`
+  const newNode: Node = {
+    id,
+    type,
+    position,
+    data: {
+      title: DEFAULT_TITLE[type],
+      config: defaultConfig(type),
+    },
+  }
+  
+  canvasRef.value.addNodes([newNode])
+}
+
 /* ===== 键盘删除 ===== */
 function onKeydown(e: KeyboardEvent) {
   // 在输入框里不拦截
@@ -187,6 +206,37 @@ function removeSelectedNode() {
   }
   selectedNode.value = null
   configNode.value = null
+}
+
+const DEFAULT_TITLE: Record<WorkflowNodeType, string> = {
+  start: '开始',
+  end: '结束',
+  llm: 'LLM 节点',
+  knowledge_retrieval: '知识检索',
+  template: '模板节点',
+  if_else: '条件分支',
+}
+
+function defaultConfig(type: WorkflowNodeType) {
+  switch (type) {
+    case 'start':
+      return {
+        variables: [{ name: 'query', label: '用户输入', type: 'string' as const, required: true }],
+      }
+    case 'end':
+      return { outputs: [] }
+    case 'llm':
+      return { systemPrompt: '', userPrompt: '', temperature: 0.7, maxTokens: 2000 }
+    case 'knowledge_retrieval':
+      return { kbId: '', query: '', topK: 5, scoreThreshold: 0.5 }
+    case 'template':
+      return { template: '' }
+    case 'if_else':
+      return {
+        branches: [{ id: 'branch_1', label: '条件 1', conditions: [] }],
+        defaultBranchId: 'default',
+      }
+  }
 }
 
 /* ===== 序列化保存 ===== */
@@ -321,9 +371,17 @@ function goBack() {
 onMounted(() => {
   loadWorkflow()
   window.addEventListener('keydown', onKeydown)
+  
+  // 监听节点点击创建事件
+  const handleNodeClick = (e: CustomEvent) => {
+    const { type } = e.detail
+    addNodeToCanvas(type)
+  }
+  document.addEventListener('node-click', handleNodeClick as EventListener)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('node-click', handleNodeClick as EventListener)
 })
 </script>
 

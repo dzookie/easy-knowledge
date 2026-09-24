@@ -12,7 +12,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Edit, Delete, Refresh, Connection, User, Upload } from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Refresh, Connection, Upload } from '@element-plus/icons-vue'
 import { workflowApis } from '@/apis'
 import { useAuthStore } from '@/stores/auth'
 import type { WorkflowRow, WorkflowGraph } from '@/types/workflow'
@@ -201,6 +201,13 @@ function creatorLabel(c: WorkflowRow['creator']): string {
   return c.nickname || c.username
 }
 
+/** 无头像时取首字母作为占位 */
+function creatorAvatarLetter(c: WorkflowRow['creator']): string {
+  if (!c) return '?'
+  const s = c.nickname || c.username
+  return s ? s.slice(0, 1).toUpperCase() : '?'
+}
+
 onMounted(loadList)
 </script>
 
@@ -289,15 +296,8 @@ onMounted(loadList)
         <!-- 元信息 -->
         <div class="wf-meta">
           <div class="wf-meta-row">
-            <span class="wf-meta-key">创建者</span>
-            <span class="wf-meta-val">
-              <el-icon><User /></el-icon>
-              {{ creatorLabel(wf.creator) }}
-            </span>
-          </div>
-          <div class="wf-meta-row">
-            <span class="wf-meta-key">创建时间</span>
-            <span class="wf-meta-val">{{ formatDate(wf.createdAt) }}</span>
+            <span class="wf-meta-key">编码</span>
+            <span class="wf-meta-val wf-meta-mono" :title="wf.code">{{ wf.code }}</span>
           </div>
           <div class="wf-meta-row">
             <span class="wf-meta-key">更新时间</span>
@@ -305,10 +305,35 @@ onMounted(loadList)
           </div>
         </div>
 
-        <!-- 操作按钮 -->
-        <div v-if="canOperate(wf)" class="wf-card-actions" @click.stop>
-          <el-button text size="small" :icon="Edit" @click="goEdit(wf)">编辑</el-button>
-          <el-button text size="small" type="danger" :icon="Delete" @click="handleDelete(wf)">删除</el-button>
+        <!-- 底部: 创建者 + 创建时间 + 操作 -->
+        <div class="wf-card-foot">
+          <div class="wf-creator">
+            <div
+              v-if="wf.creator?.avatar"
+              class="wf-creator-avatar"
+              :style="{ backgroundImage: `url(${wf.creator.avatar})` }"
+            />
+            <div v-else class="wf-creator-avatar wf-creator-avatar-text">
+              {{ creatorAvatarLetter(wf.creator) }}
+            </div>
+            <div class="wf-creator-info">
+              <span class="wf-creator-name">
+                {{ creatorLabel(wf.creator) }}
+                <el-tag
+                  v-if="wf.creator?.id === authStore.user?.id"
+                  type="primary"
+                  effect="dark"
+                  size="small"
+                  style="margin-left: 6px; height: 18px; padding: 0 6px; font-size: 11px;"
+                >我创建</el-tag>
+              </span>
+              <span class="wf-creator-date">{{ formatDate(wf.createdAt) }}</span>
+            </div>
+          </div>
+          <div v-if="canOperate(wf)" class="wf-actions" @click.stop>
+            <el-button text type="primary" size="small" :icon="Edit" @click="goEdit(wf)">编辑</el-button>
+            <el-button text type="danger" size="small" :icon="Delete" @click="handleDelete(wf)">删除</el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -373,19 +398,16 @@ onMounted(loadList)
 
 <style scoped>
 .wf-page {
-  padding: 16px 20px;
-  height: 100%;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-.wf-page::-webkit-scrollbar {
-  display: none;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 .wf-toolbar {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 16px;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 .wf-toolbar-left {
   display: flex;
@@ -394,13 +416,14 @@ onMounted(loadList)
 }
 .wf-page-title {
   margin: 0;
-  font-size: 20px;
+  font-family: var(--font-display);
+  font-size: 22px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--foreground);
 }
 .wf-page-desc {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--muted-foreground);
 }
 .wf-toolbar-right {
   display: flex;
@@ -410,175 +433,247 @@ onMounted(loadList)
 /* 统计行 */
 .wf-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
 }
 .wf-stat-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: #fff;
-  padding: 14px 16px;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  gap: 14px;
+  padding: 18px 20px;
+  background: var(--card);
+  border: 1px solid var(--border-100);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
 }
 .wf-stat-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  display: flex;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 22px;
   color: #fff;
+  flex-shrink: 0;
 }
-.wf-stat-icon-1 {
-  background: #3b82f6;
-}
-.wf-stat-icon-2 {
-  background: #22c55e;
-}
-.wf-stat-icon-3 {
-  background: #f97316;
-}
+.wf-stat-icon-1 { background: var(--brand-500); }
+.wf-stat-icon-2 { background: var(--success-500, var(--success)); }
+.wf-stat-icon-3 { background: #7C5CFF; }
 .wf-stat-body {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
 }
 .wf-stat-num {
-  font-size: 20px;
-  font-weight: 600;
-  color: #1f2937;
-  line-height: 1.2;
+  font: 600 22px/1 var(--font-display);
+  color: var(--foreground);
+  letter-spacing: -0.01em;
 }
 .wf-stat-label {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--muted-foreground);
 }
 
 /* 空状态 */
 .wf-empty {
+  margin-top: 40px;
+  padding: 64px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
+  gap: 12px;
+  background: var(--card);
+  border: 1px dashed var(--border-300);
+  border-radius: var(--radius-xl);
 }
 .wf-empty-icon {
-  font-size: 64px;
-  color: var(--el-color-primary-light-5);
-  margin-bottom: 12px;
+  font-size: 48px;
+  color: var(--muted);
+  margin-bottom: 6px;
 }
 .wf-empty-title {
-  margin: 0 0 4px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
+  margin: 0;
+  font: 600 18px var(--font-display);
+  color: var(--foreground);
 }
 .wf-empty-desc {
-  margin: 0 0 16px;
+  margin: 0 0 12px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--muted-foreground);
 }
 
 /* 卡片网格 */
 .wf-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
 }
 .wf-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border-100);
+  border-radius: var(--radius-xl);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 .wf-card:hover {
-  border-color: var(--el-color-primary-light-5);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border-100));
 }
+
+/* 顶部: 图标 + 状态/版本 tag */
 .wf-card-top {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 12px 14px 8px;
-  background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
+  align-items: flex-start;
 }
 .wf-cover {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  background: #fff;
-  display: flex;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 85%, #fff), var(--primary));
+  color: var(--primary-foreground, #fff);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--el-color-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 30%, transparent);
 }
 .wf-tags {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-end;
+  gap: 6px;
 }
+
+/* 名称 + 描述 */
 .wf-card-body {
-  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 64px;
 }
 .wf-card-title {
-  margin: 0 0 4px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #1f2937;
+  margin: 0;
+  font: 600 16px/1.35 var(--font-sans);
+  color: var(--foreground);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .wf-card-desc {
   margin: 0;
-  font-size: 12px;
-  color: #6b7280;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  min-height: 40px;
 }
+
+/* 元信息 */
 .wf-meta {
-  padding: 8px 14px;
-  border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border-100);
 }
 .wf-meta-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   font-size: 12px;
-  padding: 2px 0;
 }
 .wf-meta-key {
-  color: #9ca3af;
+  flex-shrink: 0;
+  width: 48px;
+  color: var(--muted-foreground);
 }
 .wf-meta-val {
-  color: #4b5563;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  flex: 1;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.wf-card-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-  padding: 6px 10px;
-  border-top: 1px solid #f3f4f6;
-  background: #fafbfc;
+.wf-meta-mono {
+  font-family: var(--font-mono);
 }
 
-/* 新建弹窗 - 高级 DSL 面板
-   去掉 el-collapse 默认的白底 + 上下边框外壳, 让标题直接落在弹窗内容流里 */
+/* 底部: 创建者 + 操作 */
+.wf-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 2px;
+}
+.wf-creator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.wf-creator-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+}
+.wf-creator-avatar-text {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font: 600 12px var(--font-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.wf-creator-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+.wf-creator-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wf-creator-date {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.wf-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* 新建弹窗 - 高级 DSL 面板 */
 .wf-advanced {
   margin-top: 8px;
   border-top: 1px solid #f3f4f6;
-  border-bottom: none;
 }
 .wf-advanced :deep(.el-collapse-item__header),
 .wf-advanced :deep(.el-collapse-item__wrap) {
@@ -622,5 +717,15 @@ onMounted(loadList)
   margin-top: 6px;
   font-size: 12px;
   color: #ef4444;
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .wf-card {
+    padding: 14px;
+  }
+  .wf-stats {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 </style>

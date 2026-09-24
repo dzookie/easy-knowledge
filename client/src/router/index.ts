@@ -19,7 +19,7 @@ const routes: RouteRecordRaw[] = [
     path: '/login',
     name: 'login',
     component: () => import('@/views/authForm/index.vue'),
-    meta: { public: true, title: '登录 · Easy-Knowledge' },
+    meta: { public: true, title: '登录 · MindFlow' },
   },
   {
     path: '/admin',

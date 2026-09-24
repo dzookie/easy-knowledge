@@ -48,10 +48,19 @@ const EXTRA_SUB_ROUTES: Array<{
   {
     parentPath: '/admin/knowledge',
     sub: {
+      path: '/admin/knowledge',
+      name: 'admin-knowledge',
+      component: () => import('@/views/admin/knowledge/index.vue'),
+      meta: { requiresAuth: true, title: '知识库 · MindFlow' },
+    },
+  },
+  {
+    parentPath: '/admin/knowledge',
+    sub: {
       path: '/admin/knowledge/:id',
       name: 'admin-knowledge-detail',
       component: () => import('@/views/admin/knowledge/detail.vue'),
-      meta: { requiresAuth: true, title: '知识库详情 · Easy-Knowledge' },
+      meta: { requiresAuth: true, title: '知识库详情 · MindFlow' },
     },
   },
   {
@@ -60,7 +69,7 @@ const EXTRA_SUB_ROUTES: Array<{
       path: '/admin/workflow/:id/edit',
       name: 'admin-workflow-edit',
       component: () => import('@/views/admin/workflow/edit.vue'),
-      meta: { requiresAuth: true, title: '工作流编辑器 · Easy-Knowledge' },
+      meta: { requiresAuth: true, title: '工作流编辑器 · MindFlow' },
     },
   },
 ]
@@ -186,7 +195,7 @@ export function generateRouteRecords(menus: MenuItem[]): RouteRecordRaw[] {
         component: resolveComponent(item.name, item.component, item.path),
         meta: {
           requiresAuth: true,
-          title: `${item.name} · Easy-Knowledge`,
+          title: `${item.name} · MindFlow`,
         },
       }
       routes.push(route)

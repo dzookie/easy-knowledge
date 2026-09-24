@@ -47,7 +47,7 @@ const submitting = ref(false)
 const defaultForm = (): KnowledgeForm => ({
   name: '',
   description: '',
-  embeddingModel: 'qwen3.7-text-embedding',
+  embeddingModel: 'qllama/bge-m3:latest',
   chunkStrategy: 'recursive',
   chunkSize: 500,
   chunkOverlap: 50,
@@ -59,6 +59,7 @@ const form = reactive<KnowledgeForm>(defaultForm())
 
 /* ===== 选项 ===== */
 const modelOptions = [
+  { label: 'qllama/bge-m3:latest(Ollama 本地,1024维)', value: 'qllama/bge-m3:latest' },
   { label: 'qwen3.7-text-embedding(阿里云千问,1024维)', value: 'qwen3.7-text-embedding' },
 ]
 const strategyOptions = [

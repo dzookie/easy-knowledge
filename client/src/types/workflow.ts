@@ -144,7 +144,7 @@ export interface WorkflowRow {
   status: number
   createdAt: string
   updatedAt: string
-  creator: { id: string; username: string; nickname: string | null } | null
+  creator: { id: string; username: string; nickname: string | null; avatar: string | null } | null
 }
 
 /** 工作流详情 */

@@ -108,6 +108,9 @@ onBeforeUnmount(() => {
 
 defineExpose({
   fitView: () => flowRef.value?.fitView(),
+  addNodes: (newNodes: Node[]) => {
+    emit('update:nodes', [...props.nodes, ...newNodes])
+  },
 })
 
 const DEFAULT_TITLE: Record<WorkflowNodeType, string> = {

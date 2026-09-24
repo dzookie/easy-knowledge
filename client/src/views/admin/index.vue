@@ -23,8 +23,33 @@ const menuStore = useMenuStore()
 // Element Plus 图标全集(用于动态渲染 <component :is="iconMap[name]" />)
 const iconMap = ElementPlusIconsVue as unknown as Record<string, any>
 
-/* 当前激活的菜单 key(取路由 path) */
-const activeMenu = computed(() => route.path)
+/* 当前激活的菜单 key: 精确匹配或最长前缀匹配 (详情页 /admin/knowledge/123 应命中 /admin/knowledge) */
+const activeMenu = computed(() => {
+  const path = route.path
+  // 精确匹配
+  if (menuStore.menus.some(hasLeafWithPath, path)) return path
+  // 前缀匹配: 找最长的菜单路径作为 active
+  let best = ''
+  walkLeaves(menuStore.menus, (p) => {
+    if (path.startsWith(p) && p.length > best.length) best = p
+  })
+  return best || path
+})
+
+/** 遍历菜单树的所有叶子路径 */
+function walkLeaves(menus: any[], fn: (path: string) => void) {
+  for (const item of menus) {
+    if (item.type === 1 && item.children?.length) walkLeaves(item.children, fn)
+    else if (item.type === 2 && item.path) fn(item.path)
+  }
+}
+
+/** Array.some 的 this 参数辅助: 检查菜单树是否有叶子路径等于 this */
+function hasLeafWithPath(this: string, node: any): boolean {
+  if (node.type === 1) return node.children?.some(hasLeafWithPath, this) ?? false
+  if (node.type === 2) return node.path === this
+  return false
+}
 
 /* 菜单点击: EP Menu 的 router 模式会自动跳转, 这里仅兜底 */
 function onMenuSelect(index: string) {
@@ -61,8 +86,8 @@ function renderIcon(iconName: string | null) {
     <!-- ============ 侧栏 ============ -->
     <aside class="admin-sidebar">
       <div class="admin-brand">
-        <img src="/logo.svg" alt="Easy-Knowledge" class="admin-brand-logo" />
-        <span class="admin-brand-text">Easy-Knowledge</span>
+        <img src="/logo.svg" alt="MindFlow" class="admin-brand-logo" />
+        <span class="admin-brand-text">MindFlow</span>
       </div>
 
       <el-menu

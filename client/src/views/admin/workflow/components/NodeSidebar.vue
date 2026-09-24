@@ -39,6 +39,12 @@ function onDragStart(e: DragEvent, type: WorkflowNodeType) {
   e.dataTransfer.setData('application/workflow-node-type', type)
   e.dataTransfer.effectAllowed = 'copy'
 }
+
+function onNodeClick(type: WorkflowNodeType) {
+  // 点击节点时触发创建
+  const event = new CustomEvent('node-click', { detail: { type } })
+  document.dispatchEvent(event)
+}
 </script>
 
 <template>
@@ -54,6 +60,7 @@ function onDragStart(e: DragEvent, type: WorkflowNodeType) {
         class="wf-sidebar-item"
         draggable="true"
         @dragstart="onDragStart($event, item.type)"
+        @click="onNodeClick(item.type)"
       >
         <div class="wf-sidebar-icon" :style="{ backgroundColor: item.color }">
           <el-icon :size="14" color="#fff">

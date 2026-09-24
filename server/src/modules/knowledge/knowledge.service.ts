@@ -200,7 +200,7 @@ export class KnowledgeService implements OnModuleInit {
         data: {
           name: dto.name,
           description: dto.description ?? null,
-          embeddingModel: dto.embeddingModel ?? 'qwen3.7-text-embedding',
+          embeddingModel: dto.embeddingModel ?? 'qllama/bge-m3:latest',
           collection: 'pending',
           chunkStrategy: dto.chunkStrategy ?? 'recursive',
           chunkSize: dto.chunkSize ?? 500,

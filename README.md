@@ -1,6 +1,6 @@
-# Easy-Knowledge
+# MindFlow
 
-一个基于 RAG（检索增强生成）的知识库问答系统，支持文档上传、语义切片、向量检索、AI 问答，以及通过 API Key 对外提供知识问答服务。
+一个基于 RAG（检索增强生成）的知识库问答与工作流编排平台，支持文档上传、语义切片、向量检索、AI 问答，可视化工作流编排与调试，以及通过 API Key 对外提供知识问答和工作流调用服务。
 
 ## 功能特性
 
@@ -10,6 +10,7 @@
 - **RAG 问答**：向量检索 + LLM 生成，流式输出（SSE），支持召回详情与 Prompt 调试
 - **对外服务**：通过 API Key 对外提供问答接口，支持同步 / 流式（SSE）两种模式
 - **权限系统**：基于角色（RBAC）的用户、菜单、权限管理
+- **工作流编排**：可视化流程编辑器，支持 LLM、知识检索、条件分支等节点，拖拽连线，运行调试
 - **主控台**：知识库/文档/切片统计、系统状态监控、最近文档处理
 
 ## 技术栈
@@ -26,7 +27,7 @@
 ## 项目结构
 
 ```
-easy-knowledge/
+mindflow/
 ├── client/          # 前端 (Vue3 + Element Plus)
 │   └── src/
 │       ├── apis/        # API 封装 (按领域分文件)
@@ -92,7 +93,7 @@ curl -X POST http://localhost:3030/api/service/chat \
 |------|------|
 | `common/rag` | RAG 核心：检索 + Prompt 组装 + 流式生成（后台问答与对外服务共享） |
 | `common/llm` | LLM 封装：同步 chat + 流式 chatStream（区分 thinking/content） |
-| `common/embedding` | 文本向量化（DashScope 通义千问 embedding） |
+| `common/embedding` | 文本向量化（本地 Ollama qllama/bge-m3:latest） |
 | `document/chunkers` | 三种切片策略：recursive / semantic / fixed |
 | `modules/service` | 对外 API Key 服务调用 |
 | `modules/chat` | 后台 RAG 流式问答 |

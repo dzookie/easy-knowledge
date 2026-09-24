@@ -2,13 +2,15 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 /**
- * DashScope 千问 Embedding 服务
+ * Embedding 向量服务
  *
- * 通过阿里云 DashScope 兼容 OpenAI 的 /v1/embeddings 接口批量向量化.
- * 当前使用模型 qwen3.7-text-embedding, 输出维度由 EMBEDDING_DIMENSION 控制(默认 1024, 与 Qdrant 对齐).
+ * 兼容 OpenAI /v1/embeddings 接口, 支持:
+ *   - 本地 Ollama (如 qllama/bge-m3:latest, 无需 API Key)
+ *   - 阿里云 DashScope 兼容端点 (如 qwen3.7-text-embedding)
  *
- * 免费额度: qwen3.7-text-embedding 100 万 token, 90 天内有效.
- * 文档: https://help.aliyun.com/zh/model-studio/developer-reference/text-embedding
+ * 通过 EMBEDDING_BASE_URL 切换端点, EMBEDDING_API_KEY 选填.
+ * 模型名需与 `ollama list` 输出的 NAME 完全一致(含命名空间), 否则报 404 model not found.
+ * 输出维度由 EMBEDDING_DIMENSION 控制 (bge-m3 默认 1024).
  */
 @Injectable()
 export class EmbeddingService implements OnModuleInit {
@@ -18,23 +20,23 @@ export class EmbeddingService implements OnModuleInit {
   private baseUrl: string;
   private model: string;
   private dimension: number;
-  /** 每批最多并发的 chunk 数 (DashScope 单次上限较大, 这里保守 20 条一批) */
+  /** 每批最多并发的 chunk 数 */
   private batchSize: number;
 
   constructor(private readonly config: ConfigService) {}
 
   onModuleInit() {
-    this.apiKey = (this.config.get<string>('DASHSCOPE_API_KEY') || '').trim();
-    this.baseUrl = (this.config.get<string>('DASHSCOPE_BASE_URL') || '').trim().replace(/\/$/, '');
-    this.model = (this.config.get<string>('EMBEDDING_MODEL') || 'qwen3.7-text-embedding').trim();
+    this.apiKey = (this.config.get<string>('EMBEDDING_API_KEY') || '').trim();
+    this.baseUrl = (this.config.get<string>('EMBEDDING_BASE_URL') || '').trim().replace(/\/$/, '');
+    this.model = (this.config.get<string>('EMBEDDING_MODEL') || 'qllama/bge-m3:latest').trim();
     this.dimension = Number(this.config.get<number>('EMBEDDING_DIMENSION') || 1024);
     this.batchSize = Number(this.config.get<number>('EMBEDDING_BATCH_SIZE') || 20);
 
-    if (!this.apiKey) {
-      this.logger.warn('⚠️  DASHSCOPE_API_KEY 未配置, 调用 embed() 会失败.');
-    }
     if (!this.baseUrl) {
-      this.baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+      this.baseUrl = 'http://127.0.0.1:11434/v1';
+    }
+    if (!this.apiKey) {
+      this.logger.warn('⚠️  EMBEDDING_API_KEY 未配置, 将不带 Authorization 头 (适用于本地 Ollama).');
     }
     this.logger.log(
       `Embedding 已配置: model=${this.model}, dimension=${this.dimension}, batch=${this.batchSize}, endpoint=${this.baseUrl}`,
@@ -53,9 +55,6 @@ export class EmbeddingService implements OnModuleInit {
    */
   async embed(texts: string[]): Promise<number[][]> {
     if (!texts || texts.length === 0) return [];
-    if (!this.apiKey) {
-      throw new Error('[Embedding] DASHSCOPE_API_KEY 未配置, 请在 server/.env 中填写.');
-    }
 
     // 空字符串的 chunk 不请求 API, 直接填充零向量(避免报错)
     const jobs = texts.map((t, idx) => ({ idx, text: t || '' }));
@@ -97,18 +96,20 @@ export class EmbeddingService implements OnModuleInit {
       input: texts,
       encoding_format: 'float',
     };
-    // qwen3.7/v4 支持 dimensions 参数, v2 不支持. 只有当配置的 dimension>0 时才加
-    if (this.dimension > 0 && this.model !== 'text-embedding-v2') {
+    // bge-m3 等 Ollama 模型不支持 dimensions 参数; 千问 qwen3.7/v4 支持; v2 不支持
+    // 用 includes 而非 startsWith: Ollama 模型名可能带命名空间前缀(如 qllama/bge-m3:latest)
+    if (this.dimension > 0 && !this.model.includes('bge-') && this.model !== 'text-embedding-v2') {
       body.dimensions = this.dimension;
     }
 
     const t0 = Date.now();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.apiKey) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+    }
     const resp = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
