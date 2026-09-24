@@ -37,7 +37,13 @@ mindflow/
 │       ├── stores/                # Pinia 状态
 │       ├── types/                 # TypeScript 类型定义 (按领域分文件)
 │       └── utils/http.ts          # axios 封装
+├── client/                    # 前端 (Vue3 + Element Plus + Vue Flow)
 ├── server/                    # 后端 (NestJS)
+│   ├── prisma/                    # Prisma 数据模型、迁移文件与种子脚本
+│   │   ├── schema.prisma          # 数据库模型定义
+│   │   ├── migrations/            # 数据库迁移 SQL (已提交到 Git)
+│   │   └── seed.ts                # 初始化管理员账号
+│   ├── .env.example               # 环境变量模板
 │   └── src/
 │       ├── common/                # 基础设施
 │       │   ├── embedding/         # 文本向量化 (Ollama)
@@ -46,7 +52,7 @@ mindflow/
 │       │   ├── rag/               # RAG 核心：检索 + Prompt 组装 + 流式生成
 │       │   ├── storage/           # 本地文件存储
 │       │   ├── guards/            # JWT / API Key 鉴权守卫
-│       │   └── prisma/            # Prisma ORM
+│       │   └── prisma/            # Prisma ORM 服务封装
 │       └── modules/               # 业务模块
 │           ├── knowledge/         # 知识库管理
 │           ├── document/          # 文档上传/解析/切片/向量化
@@ -58,7 +64,8 @@ mindflow/
 │           ├── auth/              # 认证登录
 │           ├── user/role/menu/    # 用户/角色/菜单 (RBAC)
 │           └── dashboard/         # 主控台统计
-└── prisma/                    # Prisma 数据模型与种子脚本
+└── db/                        # 数据库备份 SQL（备选初始化方式）
+    └── mindflow.sql              # 完整建表 + 初始数据
 ```
 
 ## 快速开始
@@ -90,9 +97,13 @@ npm install --legacy-peer-deps    # @nestjs/passport@12 与 nest@10 peer 冲突,
 # 配置环境变量 (参考下方 .env 配置说明)
 cp .env.example .env
 
-# 初始化数据库
+# 初始化数据库（二选一）
+# 方式 A: 使用 Prisma 迁移（推荐，与 schema 保持同步）
 npm run db:migrate                # 运行 Prisma 迁移
 npm run db:seed                   # 初始化管理员账号 (admin/admin123)
+
+# 方式 B: 直接导入 SQL 备份（已含表结构 + 初始数据）
+mysql -u root -p mindflow < ../db/mindflow.sql
 
 # 启动开发服务 (默认端口 3030)
 npm run start:dev
